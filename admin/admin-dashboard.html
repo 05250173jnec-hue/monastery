@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - Admin Panel</title>
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+  <div class="admin-dashboard">
+    <div id="sidebarMount"></div>
+    <main class="admin-main-content">
+      <div id="topbarMount"></div>
+      <div id="content"></div>
+    </main>
+  </div>
+
+  <script src="js/admin-data.js"></script>
+  <script src="js/admin-auth.js"></script>
+  <script src="js/admin-app.js"></script>
+  <script>
+    if (!AdminDB.isLoggedIn()) window.location.href = 'admin-login.html';
+
+    document.getElementById('sidebarMount').innerHTML = renderAdminSidebar('dashboard');
+    document.getElementById('topbarMount').innerHTML = renderAdminTopbar('Dashboard', 'Overview of monastery activities');
+
+    const user = AdminDB.getCurrentUser();
+    const stats = AdminDB.getStats();
+    const events = AdminDB.getEvents();
+    const regs = AdminDB.getRegistrations();
+    const donations = AdminDB.getDonations();
+    const volunteers = AdminDB.getVolunteers();
+    const tasks = AdminDB.getTasks();
+
+    const recentRegs = [...regs].sort((a,b) => new Date(b.registeredAt) - new Date(a.registeredAt)).slice(0,5);
+    const recentDonations = [...donations].sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0,5);
+    const upcomingEvents = events.filter(e => e.status === 'upcoming')
+      .sort((a,b) => new Date(a.date) - new Date(b.date)).slice(0,4);
+
+    const totalDonation = stats.totalDonations;
+    const donationGoal = 100000;
+
+    document.getElementById('content').innerHTML = `
+      <!-- Stats -->
+      <div class="stats-grid fade-in">
+        <div class="stat-card">
+          <div class="stat-top">
+            <div class="stat-icon blue">📅</div>
+            <span class="stat-trend up">${stats.upcomingEvents} active</span>
+          </div>
+          <div class="stat-value">${stats.totalEvents}</div>
+          <div class="stat-label">Total Events</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-top">
+            <div class="stat-icon green">🤝</div>
+            <span class="stat-trend up">${stats.activeVolunteers} active</span>
+          </div>
+          <div class="stat-value">${stats.totalVolunteers}</div>
+          <div class="stat-label">Volunteers</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-top">
+            <div class="stat-icon orange">📝</div>
+            <span class="stat-trend up">${stats.confirmedRegistrations} confirmed</span>
+          </div>
+          <div class="stat-value">${stats.totalRegistrations}</div>
+          <div class="stat-label">Registrations</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-top">
+            <div class="stat-icon purple">💰</div>
+            <span class="stat-trend up">${stats.totalDonors} donors</span>
+          </div>
+          <div class="stat-value" style="font-size:24px;">${AdminDB.formatCurrency(totalDonation)}</div>
+          <div class="stat-label">Total Donations</div>
+        </div>
+      </div>
+
+      <!-- Charts row -->
+      <div class="content-grid">
+        <!-- Donation trend -->
+        <div class="card">
+          <div class="card-header">
+            <h2>Donation Overview</h2>
+            <span style="font-size:12px; color:#94a3b8;">Goal: ${AdminDB.formatCurrency(donationGoal)}</span>
+          </div>
+          <div class="card-body" style="padding:20px;">
+            <div style="display:flex; align-items:flex-end; gap:14px; height:180px; padding:0 10px;">
+              ${[35, 58, 42, 72, 88, 65, 92].map((h, i) => `
+                <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:8px;">
+                  <div style="width:100%; height:${h}%; background:linear-gradient(180deg,#2563eb,#60a5fa); border-radius:6px 6px 0 0; transition:all 0.3s;"></div>
+                  <span style="font-size:11px; color:#94a3b8;">${['Oct','Nov','Dec','Jan','Feb','Mar','Apr'][i]}</span>
+                </div>
+              `).join('')}
+            </div>
+            <div style="margin-top:20px;">
+              <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px;">
+                <span style="color:#475569; font-weight:600;">Progress to goal</span>
+                <span style="font-weight:700; color:#2563eb;">${Math.round((totalDonation/donationGoal)*100)}%</span>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill blue" style="width:${Math.min(100,(totalDonation/donationGoal)*100)}%;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Registration status -->
+        <div class="card">
+          <div class="card-header">
+            <h2>Registration Status</h2>
+          </div>
+          <div class="card-body" style="padding:20px;">
+            <div style="display:flex; justify-content:center; margin-bottom:20px;">
+              <div style="width:150px; height:150px; border-radius:50%; background:conic-gradient(#22c55e 0% ${(stats.confirmedRegistrations/Math.max(stats.totalRegistrations,1))*100}%, #f59e0b ${(stats.confirmedRegistrations/Math.max(stats.totalRegistrations,1))*100}% ${((stats.confirmedRegistrations+stats.pendingRegistrations)/Math.max(stats.totalRegistrations,1))*100}%, #ef4444 ${((stats.confirmedRegistrations+stats.pendingRegistrations)/Math.max(stats.totalRegistrations,1))*100}% 100%); display:flex; align-items:center; justify-content:center;">
+                <div style="width:110px; height:110px; border-radius:50%; background:white; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+                  <div style="font-size:24px; font-weight:800;">${stats.totalRegistrations}</div>
+                  <div style="font-size:10px; color:#94a3b8;">TOTAL</div>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:8px; font-size:13px;">
+              <div style="display:flex; justify-content:space-between;"><span style="color:#475569;">🟢 Confirmed</span><strong>${stats.confirmedRegistrations}</strong></div>
+              <div style="display:flex; justify-content:space-between;"><span style="color:#475569;">🟡 Pending</span><strong>${stats.pendingRegistrations}</strong></div>
+              <div style="display:flex; justify-content:space-between;"><span style="color:#475569;">🔴 Cancelled</span><strong>${stats.totalRegistrations - stats.confirmedRegistrations - stats.pendingRegistrations}</strong></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent registrations + donations -->
+      <div class="content-grid">
+        <div class="card">
+          <div class="card-header">
+            <h2>Recent Registrations</h2>
+            <a href="admin-registrations.html" class="view-all">View all →</a>
+          </div>
+          <div class="card-body">
+            ${recentRegs.length ? recentRegs.map(r => {
+              const b = r.status === 'confirmed' ? 'badge-success' : r.status === 'pending' ? 'badge-warning' : 'badge-danger';
+              return `
+                <div class="list-item">
+                  <div class="item-icon ${r.status === 'confirmed' ? 'green' : 'orange'}">👤</div>
+                  <div class="item-info">
+                    <div class="item-title">${r.userName}</div>
+                    <div class="item-subtitle">${r.eventName}</div>
+                  </div>
+                  <span class="badge ${b}">${r.status}</span>
+                </div>
+              `;
+            }).join('') : '<div class="empty-state"><p>No registrations yet</p></div>'}
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>Recent Donations</h2>
+            <a href="admin-donations.html" class="view-all">View all →</a>
+          </div>
+          <div class="card-body">
+            ${recentDonations.length ? recentDonations.map(d => `
+              <div class="list-item">
+                <div class="item-icon ${d.type === 'product' ? 'orange' : 'green'}">${d.type === 'product' ? '🎁' : '💰'}</div>
+                <div class="item-info">
+                  <div class="item-title">${d.donor}</div>
+                  <div class="item-subtitle">${AdminDB.formatDate(d.date)}</div>
+                </div>
+                <div class="item-meta">
+                  <div class="item-amount">${d.type === 'product' ? (d.quantity + ' ' + d.unit + ' ' + d.productName) : AdminDB.formatCurrency(d.amount)}</div>
+                </div>
+              </div>
+            `).join('') : '<div class="empty-state"><p>No donations yet</p></div>'}
+          </div>
+        </div>
+      </div>
+
+      <!-- Upcoming events + task board -->
+      <div class="content-grid">
+        <div class="card">
+          <div class="card-header">
+            <h2>Upcoming Events</h2>
+            <a href="admin-events.html" class="view-all">View all →</a>
+          </div>
+          <div class="card-body">
+            ${upcomingEvents.length ? upcomingEvents.map(e => `
+              <div class="list-item">
+                <div class="item-icon blue" style="overflow:hidden;">${e.image ? `<img src="${e.image}" alt="" style="width:100%; height:100%; object-fit:cover;">` : e.icon}</div>
+                <div class="item-info">
+                  <div class="item-title">${e.name}</div>
+                  <div class="item-subtitle">${AdminDB.formatDate(e.date)} · ${e.location}</div>
+                </div>
+                <div class="item-meta">
+                  <span class="badge badge-info">${e.registered || 0} registered</span>
+                </div>
+              </div>
+            `).join('') : '<div class="empty-state"><p>No upcoming events</p></div>'}
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>Task Board</h2>
+            <a href="admin-volunteers.html" class="view-all">Manage →</a>
+          </div>
+          <div class="card-body">
+            ${tasks.slice(0,5).map(t => {
+              const b = t.status === 'done' ? 'badge-success' : t.status === 'in-progress' ? 'badge-info' : 'badge-warning';
+              return `
+                <div class="list-item">
+                  <div class="item-icon ${t.status === 'done' ? 'green' : 'orange'}">📋</div>
+                  <div class="item-info">
+                    <div class="item-title">${t.title}</div>
+                    <div class="item-subtitle">${t.assignee}</div>
+                  </div>
+                  <span class="badge ${b}">${t.status}</span>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      </div>
+    `;
+  </script>
+  <!-- Dark Mode Toggle Button -->
+<button id="darkModeToggle" onclick="toggleDarkMode()" style="position:fixed; bottom:20px; right:20px; width:50px; height:50px; border-radius:50%; background:var(--primary, #2563eb); color:white; font-size:22px; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 15px rgba(0,0,0,0.3); z-index:9999; cursor:pointer; border:none; transition:transform 0.2s;">
+  🌙
+</button>
+
+<!-- Dark Mode Script -->
+<script>
+  // Check if dark mode was previously enabled
+  if (localStorage.getItem('theme') === 'dark') {
+    document.body.classList.add('dark-mode');
+    document.getElementById('darkModeToggle').innerHTML = '☀️';
+  }
+
+  // The toggle function
+  function toggleDarkMode() {
+    document.body.classList.toggle('dark-mode');
+    const btn = document.getElementById('darkModeToggle');
+    
+    if (document.body.classList.contains('dark-mode')) {
+      localStorage.setItem('theme', 'dark');
+      btn.innerHTML = '☀️'; // Sun icon for light mode
+    } else {
+      localStorage.setItem('theme', 'light');
+      btn.innerHTML = '🌙'; // Moon icon for dark mode
+    }
+  }
+</script>
+</body>
+</body>
+</html>

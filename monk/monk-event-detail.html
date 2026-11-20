@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Event Details - Monastery Events</title>
+  <link rel="stylesheet" href="css/monk.css">
+  <style>
+    /* Event hero banner (the card-scoped styles in monk.css don't apply on this page) */
+    .event-hero {
+      position: relative;
+      height: 200px;
+      border-radius: 20px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 80px;
+      line-height: 1;
+      background: linear-gradient(135deg, #7c3aed, #a78bfa);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+    .event-hero.gold  { background: linear-gradient(135deg, #f59e0b, #fbbf24); }
+    .event-hero.green { background: linear-gradient(135deg, #22c55e, #4ade80); }
+    .event-hero.blue  { background: linear-gradient(135deg, #06b6d4, #22d3ee); }
+    .event-hero.pink  { background: linear-gradient(135deg, #ec4899, #f472b6); }
+
+    .event-hero .event-date-badge {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: #fff;
+      border-radius: 10px;
+      padding: 8px 16px;
+      text-align: center;
+      box-shadow: var(--shadow-sm);
+    }
+    .event-hero .event-date-badge .day {
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--text-primary);
+      line-height: 1;
+    }
+    .event-hero .event-date-badge .month {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 2px;
+    }
+    .event-hero .event-status {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .detail-type {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--primary);
+    }
+  </style>
+</head>
+<body>
+  <div class="monk-dashboard">
+    <div id="sidebarMount"></div>
+
+    <main class="monk-main-content">
+      <div id="topbarMount"></div>
+      <div id="eventDetail"></div>
+    </main>
+  </div>
+
+  <script src="js/monk-data.js"></script>
+  <script src="js/monk-auth.js"></script>
+  <script src="js/monk-app.js"></script>
+  <script>
+    if (!MonkDB.isLoggedIn()) window.location.href = 'monk-login.html';
+    document.getElementById('sidebarMount').innerHTML = renderMonkSidebar('events');
+    document.getElementById('topbarMount').innerHTML = renderTopbar('Event Details');
+
+    const params = new URLSearchParams(window.location.search);
+    const eventId = params.get('id');
+    const event = MonkDB.getEventById(eventId);
+    const user = MonkDB.getCurrentUser();
+
+    if (!event) {
+      document.getElementById('eventDetail').innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">❌</div>
+          <h3>Event not found</h3>
+          <p>The event you're looking for doesn't exist.</p>
+          <a href="monk-events.html" class="btn btn-primary" style="width:auto; margin-top:16px;">Back to Events</a>
+        </div>
+      `;
+    } else {
+      const reg = MonkDB.getRegistrationForEvent(user.id, event.id);
+      const { day, month } = MonkDB.getDayMonth(event.date);
+
+      let actionHTML = '';
+      if (reg) {
+        const badgeClass = reg.status === 'confirmed' ? 'badge-success' : reg.status === 'pending' ? 'badge-warning' : 'badge-danger';
+        actionHTML = `
+          <div style="padding:16px; background:#faf9ff; border-radius:12px; margin-bottom:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <div style="font-size:12px; color:#8b8ba7; margin-bottom:4px;">Your Registration</div>
+                <span class="badge ${badgeClass}">${reg.status === 'pending' ? 'REGISTERED' : reg.status.toUpperCase()}</span>
+              </div>
+              ${reg.status !== 'cancelled' ? `<button class="btn btn-danger btn-sm" onclick="confirmCancelRegistration('${reg.id}', '${event.name}')">Cancel</button>` : ''}
+            </div>
+            ${reg.notes ? `<div style="margin-top:12px; font-size:13px; color:#4c1d95;"><strong>Notes:</strong> ${reg.notes}</div>` : ''}
+          </div>
+        `;
+      } else if (event.status === 'completed') {
+        actionHTML = `<button class="btn btn-outline" disabled>Event Completed</button>`;
+      } else {
+        actionHTML = `<button class="btn btn-primary" onclick="openRegisterModal('${event.id}')">Register for this Event</button>`;
+      }
+
+      document.getElementById('eventDetail').innerHTML = `
+        <a href="monk-events.html" style="display:inline-flex; align-items:center; gap:6px; color:#7c3aed; font-weight:600; margin-bottom:20px; font-size:14px;">← Back to Events</a>
+
+        <div class="event-hero ${event.color}" ${event.image ? `style="background: url('${event.image}') center / cover no-repeat;"` : ''}>
+          ${event.image ? '' : event.icon}
+          <div class="event-date-badge">
+            <div class="day">${day}</div>
+            <div class="month">${month}</div>
+          </div>
+          <div class="event-status ${event.status}">${event.status}</div>
+        </div>
+
+        <div class="content-grid">
+          <div class="card">
+            <div class="card-body" style="padding:28px;">
+              <div class="detail-type" style="margin-bottom:8px;">${event.type}</div>
+              <h1 style="font-size:28px; font-weight:800; margin-bottom:12px;">${event.name}</h1>
+              <p style="color:#8b8ba7; line-height:1.7; margin-bottom:24px;">${event.description}</p>
+
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:24px;">
+                <div style="padding:14px; background:#faf9ff; border-radius:10px;">
+                  <div style="font-size:11px; color:#8b8ba7; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Date</div>
+                  <div style="font-weight:700; font-size:14px;">${MonkDB.formatDate(event.date)}</div>
+                </div>
+                <div style="padding:14px; background:#faf9ff; border-radius:10px;">
+                  <div style="font-size:11px; color:#8b8ba7; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Time</div>
+                  <div style="font-weight:700; font-size:14px;">${event.time}</div>
+                </div>
+                <div style="padding:14px; background:#faf9ff; border-radius:10px;">
+                  <div style="font-size:11px; color:#8b8ba7; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Location</div>
+                  <div style="font-weight:700; font-size:14px;">${event.location}</div>
+                </div>
+                <div style="padding:14px; background:#faf9ff; border-radius:10px;">
+                  <div style="font-size:11px; color:#8b8ba7; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Organizer</div>
+                  <div style="font-weight:700; font-size:14px;">${event.organizer}</div>
+                </div>
+              </div>
+
+              <div style="margin-bottom:20px;">
+                <h3 style="font-size:14px; font-weight:700; margin-bottom:8px;">📋 Requirements</h3>
+                <p style="font-size:13px; color:#8b8ba7; line-height:1.7;">${event.requirements}</p>
+              </div>
+
+              ${actionHTML}
+            </div>
+          </div>
+
+          <div>
+            <div class="card" style="margin-bottom:20px;">
+              <div class="card-header">
+                <h2>Registration Status</h2>
+              </div>
+              <div class="card-body" style="padding:20px;">
+                <div style="text-align:center; padding:20px 0;">
+                  <div style="font-size:42px; font-weight:800; color:#7c3aed;">${event.registered || 0}</div>
+                  <div style="font-size:13px; color:#8b8ba7;">people registered</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <h2>Quick Info</h2>
+              </div>
+              <div class="card-body" style="padding:20px;">
+                <div style="font-size:13px; line-height:2; color:#8b8ba7;">
+                  <div>📅 <strong style="color:#1e1b4b;">${MonkDB.formatDate(event.date)}</strong></div>
+                  <div>📍 <strong style="color:#1e1b4b;">${event.location}</strong></div>
+                  <div>🏷️ <strong style="color:#1e1b4b;">${event.type}</strong></div>
+                  <div>👤 <strong style="color:#1e1b4b;">${event.organizer}</strong></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+  </script>
+</body>
+</html>

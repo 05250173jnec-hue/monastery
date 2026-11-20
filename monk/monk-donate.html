@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Donate - Monastery Events</title>
+  <link rel="stylesheet" href="css/monk.css">
+</head>
+<body>
+  <div class="monk-dashboard">
+    <div id="sidebarMount"></div>
+
+    <main class="monk-main-content">
+      <div id="topbarMount"></div>
+
+      <div class="page-header">
+        <div>
+          <h1>Make a Donation</h1>
+          <p>Give money or goods to support the monastery &mdash; no event needed, any time.</p>
+        </div>
+        <span class="open-pill">Donations open 24/7</span>
+      </div>
+
+      <div class="donate-grid">
+        <!-- ================= FORM ================= -->
+        <div class="card">
+          <div class="card-body" style="padding:24px;">
+            <div class="donate-type" role="tablist" aria-label="Donation type">
+              <button type="button" class="type-card active" id="typeMoney" role="tab" aria-selected="true" onclick="setType('money')">
+                <div class="type-icon">💰</div>
+                <div><strong>Money Donation</strong><span class="sub">Give any amount</span></div>
+              </button>
+              <button type="button" class="type-card" id="typeProduct" role="tab" aria-selected="false" onclick="setType('product')">
+                <div class="type-icon">🎁</div>
+                <div><strong>Product Donation</strong><span class="sub">Food, books, candles &amp; more</span></div>
+              </button>
+            </div>
+
+            <form class="donate-form" id="donateForm" onsubmit="submitDonation(event)" novalidate>
+              <!-- Money fields -->
+              <div id="moneyFields">
+                <div class="form-group">
+                  <label>Quick amount (Nu.)</label>
+                  <div class="amount-chips" id="amountChips"></div>
+                  <div class="input-wrapper">
+                    <span class="input-icon">💰</span>
+                    <input type="number" id="dAmount" min="1" step="1" placeholder="Enter amount in Nu.">
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Payment method</label>
+                  <div class="input-wrapper">
+                    <span class="input-icon">💳</span>
+                    <select id="dMethod" onchange="toggleQR()">
+                      <option value="QR Scan">Scan QR (mBoB / mPay / any banking app)</option>
+                      <option value="Cash">Cash at the monastery office</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div id="qrBox" class="qr-box">
+                  <img src="../image/donation-qr.png" alt="Donation QR code" class="qr-img">
+                  <ol class="qr-steps">
+                    <li>Enter the amount above.</li>
+                    <li>Scan this QR with your banking app and pay the same amount.</li>
+                    <li>Type the <b>transaction / journal number</b> from your payment receipt below.</li>
+                    <li>Press <b>Donate Now</b> &mdash; it appears in the admin's donation list straight away and is confirmed after the payment is checked.</li>
+                  </ol>
+                </div>
+                <div class="form-group" id="txnWrap">
+                  <label>Transaction / journal number</label>
+                  <div class="input-wrapper">
+                    <span class="input-icon">🧾</span>
+                    <input type="text" id="dTxn" placeholder="From your payment receipt">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Product fields -->
+              <div id="productFields" style="display:none;">
+                <div class="form-group">
+                  <label>Product name</label>
+                  <div class="input-wrapper">
+                    <span class="input-icon">📦</span>
+                    <input type="text" id="pName" placeholder="e.g. Rice, Butter, Robes, Books">
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>Category</label>
+                    <div class="input-wrapper">
+                      <span class="input-icon">🏷️</span>
+                      <select id="pCategory">
+                        <option>Food &amp; Grains</option>
+                        <option>Butter &amp; Lamp Oil</option>
+                        <option>Robes &amp; Clothing</option>
+                        <option>Books &amp; Scriptures</option>
+                        <option>Medicine &amp; Health</option>
+                        <option>Furniture &amp; Equipment</option>
+                        <option>Other</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label>Quantity</label>
+                    <div style="display:flex; gap:8px;">
+                      <div class="input-wrapper" style="flex:1;">
+                        <span class="input-icon">#️⃣</span>
+                        <input type="number" id="pQty" min="1" step="1" placeholder="10">
+                      </div>
+                      <div class="input-wrapper" style="width:110px;">
+                        <select id="pUnit" style="padding-left:14px;">
+                          <option>pcs</option><option>kg</option><option>boxes</option><option>bags</option><option>litres</option><option>sets</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>Estimated value, Nu. (optional)</label>
+                    <div class="input-wrapper">
+                      <span class="input-icon">💰</span>
+                      <input type="number" id="pValue" min="0" step="1" placeholder="0">
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label>How will it reach us?</label>
+                    <div class="input-wrapper">
+                      <span class="input-icon">🚚</span>
+                      <select id="pHandover" onchange="togglePickup()">
+                        <option value="Drop-off">I will drop it off</option>
+                        <option value="Pickup">Please pick it up</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <div class="form-group" id="pickupWrap" style="display:none;">
+                  <label>Pickup address</label>
+                  <div class="input-wrapper">
+                    <span class="input-icon">📍</span>
+                    <input type="text" id="pAddress" placeholder="Village / street / landmark">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Shared -->
+              <div class="form-group">
+                <label>Dedicate to an event (optional)</label>
+                <div class="input-wrapper">
+                  <span class="input-icon">📅</span>
+                  <select id="dEvent"></select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Message / notes (optional)</label>
+                <textarea id="dNotes" rows="3" placeholder="A prayer, a dedication, or anything we should know..."></textarea>
+              </div>
+
+              <button type="submit" class="btn btn-primary btn-submit" id="submitBtn">Donate Now 🙏</button>
+            </form>
+          </div>
+        </div>
+
+        <!-- ================= HISTORY ================= -->
+        <div>
+          <div class="donation-summary" id="donSummary"></div>
+          <div class="card">
+            <div class="card-header"><h2>My Donations</h2></div>
+            <div class="card-body" id="myDonations"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="js/monk-data.js"></script>
+  <script src="js/monk-auth.js"></script>
+  <script src="js/monk-app.js"></script>
+  <script>
+    if (!MonkDB.isLoggedIn()) window.location.href = 'monk-login.html';
+    const user = MonkDB.getCurrentUser();
+
+    document.getElementById('sidebarMount').innerHTML = renderMonkSidebar('donate');
+
+    let donationType = 'money';
+    const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+    // Quick amount chips
+    document.getElementById('amountChips').innerHTML = [100, 500, 1000, 2000, 5000]
+      .map(a => `<div class="chip" onclick="pickAmount(${a}, this)">Nu ${a.toLocaleString('en-US')}</div>`).join('');
+
+    // Event dropdown: general by default, upcoming events optional
+    document.getElementById('dEvent').innerHTML =
+      '<option value="">General Donation (no specific event)</option>' +
+      MonkDB.getEvents().filter(e => e.status === 'upcoming')
+        .map(e => `<option value="${esc(e.id)}">${esc(e.name)}</option>`).join('');
+
+    function pickAmount(a, el) {
+      document.getElementById('dAmount').value = a;
+      document.querySelectorAll('#amountChips .chip').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+    }
+    document.getElementById('dAmount').addEventListener('input', () =>
+      document.querySelectorAll('#amountChips .chip').forEach(c => c.classList.remove('active')));
+
+    function setType(t) {
+      donationType = t;
+      const money = t === 'money';
+      document.getElementById('moneyFields').style.display = money ? '' : 'none';
+      document.getElementById('productFields').style.display = money ? 'none' : '';
+      [['typeMoney', money], ['typeProduct', !money]].forEach(([id, on]) => {
+        const el = document.getElementById(id);
+        el.classList.toggle('active', on);
+        el.setAttribute('aria-selected', on);
+      });
+      document.getElementById('submitBtn').textContent = money ? 'Donate Now 🙏' : 'Submit Product Donation 🎁';
+    }
+
+    function toggleQR() {
+      const qr = document.getElementById('dMethod').value === 'QR Scan';
+      document.getElementById('qrBox').style.display = qr ? '' : 'none';
+      document.getElementById('txnWrap').style.display = qr ? '' : 'none';
+    }
+
+    function togglePickup() {
+      document.getElementById('pickupWrap').style.display =
+        document.getElementById('pHandover').value === 'Pickup' ? '' : 'none';
+    }
+
+    function submitDonation(e) {
+      e.preventDefault();
+      const data = {
+        type: donationType,
+        eventId: document.getElementById('dEvent').value,
+        description: document.getElementById('dNotes').value
+      };
+      if (donationType === 'money') {
+        data.amount = document.getElementById('dAmount').value;
+        data.method = document.getElementById('dMethod').value;
+        data.txnId = document.getElementById('dTxn').value;
+      } else {
+        data.productName = document.getElementById('pName').value;
+        data.category = document.getElementById('pCategory').value;
+        data.quantity = document.getElementById('pQty').value;
+        data.unit = document.getElementById('pUnit').value;
+        data.estValue = document.getElementById('pValue').value;
+        data.handover = document.getElementById('pHandover').value;
+        data.pickupAddress = document.getElementById('pAddress').value.trim();
+        if (data.handover === 'Pickup' && !data.pickupAddress) {
+          showToast('Please enter a pickup address', 'error');
+          return;
+        }
+      }
+      const res = MonkDB.addDonation(user.id, data);
+      if (!res.success) { showToast(res.message, 'error'); return; }
+      showToast('Thank you! Your donation was submitted 🙏', 'success');
+      document.getElementById('donateForm').reset();
+      document.querySelectorAll('#amountChips .chip').forEach(c => c.classList.remove('active'));
+      togglePickup();
+      toggleQR();
+      renderHistory();
+    }
+
+    function renderHistory() {
+      const list = MonkDB.getMyDonations(user.id);
+      const money = list.filter(d => d.type !== 'product' && d.status !== 'pending' && d.status !== 'declined');
+      const prods = list.filter(d => d.type === 'product');
+      const total = money.reduce((s, d) => s + Number(d.amount), 0);
+
+      document.getElementById('donSummary').innerHTML = `
+        <div class="mini"><b>Nu ${total.toLocaleString('en-US')}</b><span>Confirmed in money</span></div>
+        <div class="mini"><b>${prods.length}</b><span>Product donations</span></div>
+        <div class="mini"><b>${list.length}</b><span>Total gifts</span></div>`;
+
+      document.getElementById('myDonations').innerHTML = list.length ? list.map(d => {
+        const isP = d.type === 'product';
+        const title = isP ? `${esc(d.productName)} · ${esc(d.quantity)} ${esc(d.unit)}` : 'Nu ' + Number(d.amount).toLocaleString('en-US');
+        const badge = d.status === 'received' ? 'badge-success' : d.status === 'declined' ? 'badge-danger' : 'badge-warning';
+        const label = d.status === 'received' ? 'confirmed' : d.status === 'pending' ? 'awaiting confirmation' : d.status;
+        return `
+          <div class="list-item">
+            <div class="item-icon ${isP ? 'gold' : 'green'}">${isP ? '🎁' : '💰'}</div>
+            <div class="item-info">
+              <div class="item-title">${title}</div>
+              <div class="item-subtitle">${MonkDB.formatDate(d.date)} · ${esc(d.eventName)} · ${esc(d.method)}${d.txnId ? ' · Ref ' + esc(d.txnId) : ''}</div>
+            </div>
+            <span class="badge ${badge}">${esc(label)}</span>
+          </div>`;
+      }).join('') : `<div class="empty-state" style="padding:30px;"><div class="empty-icon">💝</div><p>No donations yet. Your first gift will appear here.</p></div>`;
+    }
+
+    renderHistory();
+  </script>
+</body>
+</html>

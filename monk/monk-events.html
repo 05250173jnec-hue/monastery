@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Events - Monastery Events</title>
+  <link rel="stylesheet" href="css/monk.css">
+</head>
+<body>
+  <div class="monk-dashboard">
+    <div id="sidebarMount"></div>
+
+    <main class="monk-main-content">
+      <div id="topbarMount"></div>
+
+      <div class="page-header">
+        <div>
+          <h1>Monastery Events</h1>
+          <p>Browse and register for upcoming spiritual events</p>
+        </div>
+      </div>
+
+      <div class="search-bar">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchInput" placeholder="Search events by name, type, or location..." oninput="filterEvents()">
+      </div>
+
+      <div class="filter-chips" id="filterChips">
+        <div class="chip active" data-filter="all" onclick="setFilter('all', this)">All Events</div>
+        <div class="chip" data-filter="upcoming" onclick="setFilter('upcoming', this)">Upcoming</div>
+        <div class="chip" data-filter="completed" onclick="setFilter('completed', this)">Completed</div>
+      </div>
+
+      <div class="events-grid" id="eventsGrid"></div>
+    </main>
+  </div>
+
+  <script src="js/monk-data.js"></script>
+  <script src="js/monk-auth.js"></script>
+  <script src="js/monk-app.js"></script>
+  <script>
+    if (!MonkDB.isLoggedIn()) window.location.href = 'monk-login.html';
+
+    document.getElementById('sidebarMount').innerHTML = renderMonkSidebar('events');
+   
+
+    let currentFilter = 'all';
+    let searchQuery = '';
+
+    function renderEvents() {
+      let events = MonkDB.getEvents();
+
+      // Filter by status
+      if (currentFilter !== 'all') {
+        events = events.filter(e => e.status === currentFilter);
+      }
+
+      // Filter by search
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        events = events.filter(e =>
+          e.name.toLowerCase().includes(q) ||
+          e.type.toLowerCase().includes(q) ||
+          e.location.toLowerCase().includes(q)
+        );
+      }
+
+      const grid = document.getElementById('eventsGrid');
+      if (events.length === 0) {
+        grid.innerHTML = `
+          <div class="empty-state" style="grid-column:1/-1;">
+            <div class="empty-icon">🔍</div>
+            <h3>No events found</h3>
+            <p>Try adjusting your search or filters.</p>
+          </div>
+        `;
+      } else {
+        grid.innerHTML = events.map(e => buildEventCard(e)).join('');
+      }
+    }
+
+    function setFilter(filter, el) {
+      currentFilter = filter;
+      document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      renderEvents();
+    }
+
+    function filterEvents() {
+      searchQuery = document.getElementById('searchInput').value.trim();
+      renderEvents();
+    }
+
+    renderEvents();
+  </script>
+</body>
+</html>

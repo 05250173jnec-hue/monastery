@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Registrations - Admin</title>
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+  <div class="admin-dashboard">
+    <div id="sidebarMount"></div>
+    <main class="admin-main-content">
+      <div id="topbarMount"></div>
+
+      <div class="page-header">
+        <div>
+          <h1>Registrations</h1>
+          <p>Manage participant registrations</p>
+        </div>
+      </div>
+
+      <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);">
+        <div class="stat-card"><div class="stat-value" id="rTotal">0</div><div class="stat-label">Total</div></div>
+      </div>
+
+      <div class="search-bar">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchReg" placeholder="Search by name or event..." oninput="renderRegs()">
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr><th>Registrant</th><th>Event</th><th>Date</th><th>Registered On</th><th>Actions</th></tr>
+          </thead>
+          <tbody id="regsTable"></tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <script src="js/admin-data.js"></script>
+  <script src="js/admin-auth.js"></script>
+  <script src="js/admin-app.js"></script>
+  <script>
+    if (!AdminDB.isLoggedIn()) window.location.href = 'admin-login.html';
+    document.getElementById('sidebarMount').innerHTML = renderAdminSidebar('registrations');
+    
+    function updateStats() {
+      const regs = AdminDB.getRegistrations();
+      document.getElementById('rTotal').textContent = regs.length;
+    }
+
+    function renderRegs() {
+      updateStats();
+      const q = document.getElementById('searchReg').value.toLowerCase();
+      let regs = AdminDB.getRegistrations();
+      if (q) regs = regs.filter(r => r.userName.toLowerCase().includes(q) || r.eventName.toLowerCase().includes(q));
+      regs.sort((a,b) => new Date(b.registeredAt) - new Date(a.registeredAt));
+
+      const tbody = document.getElementById('regsTable');
+      if (!regs.length) {
+        tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">📝</div><h3>No registrations</h3></div></td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = regs.map(r => `
+        <tr>
+          <td>
+            <div style="font-weight:700;">${r.userName}</div>
+            <div style="font-size:11px; color:#94a3b8;">${r.userEmail}</div>
+          </td>
+          <td>${r.eventName}</td>
+          <td>${AdminDB.formatDate(r.eventDate)}</td>
+          <td>${AdminDB.formatDate(r.registeredAt)}</td>
+          <td>
+            <div style="display:flex; gap:4px;">
+              <button class="btn-icon" onclick="deleteReg('${r.id}')" title="Delete">🗑️</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function deleteReg(id) {
+      if (confirm('Delete this registration permanently?')) {
+        AdminDB.deleteRegistration(id);
+        showToast('Registration deleted', 'warning');
+        renderRegs();
+      }
+    }
+
+    renderRegs();
+  </script>
+</body>
+</html>

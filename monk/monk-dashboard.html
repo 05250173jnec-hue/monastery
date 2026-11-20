@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - Monastery Events</title>
+  <link rel="stylesheet" href="css/monk.css">
+</head>
+<body>
+  <div class="monk-dashboard">
+    <div id="sidebarMount"></div>
+
+    <main class="monk-main-content">
+      <div id="topbarMount"></div>
+
+      <!-- Hero Banner -->
+      <div class="hero-banner fade-in">
+        <h2 id="heroGreeting">Welcome back, Karma!</h2>
+        <p>Here's what's happening in your monastery community.</p>
+        <div class="hero-actions">
+          <a href="monk-events.html" class="btn-white">Browse Events →</a>
+          <a href="monk-registrations.html" class="btn-ghost">My Registrations</a>
+          <a href="monk-donate.html" class="btn-ghost">💝 Donate</a>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-grid fade-in" id="statsGrid"></div>
+
+      <!-- Upcoming Events -->
+      <div class="section-header">
+        <h2>Upcoming Events</h2>
+        <a href="monk-events.html" class="view-all">View all →</a>
+      </div>
+      <div class="events-grid" id="upcomingEvents"></div>
+
+      <!-- Recent Activity -->
+      <div class="content-grid">
+        <div class="card">
+          <div class="card-header">
+            <h2>My Recent Registrations</h2>
+            <a href="monk-registrations.html" class="view-all">View all →</a>
+          </div>
+          <div class="card-body" id="recentRegs"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>Notifications</h2>
+            <a href="monk-notifications.html" class="view-all">View all →</a>
+          </div>
+          <div class="card-body" id="recentNotifs"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="js/monk-data.js"></script>
+  <script src="js/monk-auth.js"></script>
+  <script src="js/monk-app.js"></script>
+  <script>
+    // Guard
+    if (!MonkDB.isLoggedIn()) {
+      window.location.href = 'monk-login.html';
+    }
+
+    const user = MonkDB.getCurrentUser();
+
+    // Sidebar + Topbar
+    document.getElementById('sidebarMount').innerHTML = renderMonkSidebar('dashboard');
+    document.getElementById('topbarMount').innerHTML = renderTopbar('Dashboard', 'Your spiritual activity overview');
+
+    // Hero greeting
+    document.getElementById('heroGreeting').textContent = `Welcome back, ${user.name.split(' ')[0]}! 🙏`;
+
+    // Stats
+    const myRegs = MonkDB.getMyRegistrations(user.id);
+    const upcoming = MonkDB.getUpcomingEvents();
+    const confirmed = myRegs.filter(r => r.status === 'confirmed').length;
+    const pending = myRegs.filter(r => r.status === 'pending').length;
+    const unread = MonkDB.getUnreadCount(user.id);
+
+    document.getElementById('statsGrid').innerHTML = `
+      <div class="stat-card">
+        <div class="stat-icon purple">📅</div>
+        <div class="stat-value">${upcoming.length}</div>
+        <div class="stat-label">Upcoming Events</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon green">✅</div>
+        <div class="stat-value">${confirmed}</div>
+        <div class="stat-label">Confirmed Registrations</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon gold">⏳</div>
+        <div class="stat-value">${pending}</div>
+        <div class="stat-label">Registered</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon blue">🔔</div>
+        <div class="stat-value">${unread}</div>
+        <div class="stat-label">Unread Notifications</div>
+      </div>
+    `;
+
+    // Upcoming events (3)
+    const upcomingList = upcoming.slice(0, 3);
+    document.getElementById('upcomingEvents').innerHTML = upcomingList.length
+      ? upcomingList.map(e => buildEventCard(e)).join('')
+      : `<div class="empty-state" style="grid-column:1/-1;"><div class="empty-icon">📅</div><h3>No upcoming events</h3><p>Check back later for new events.</p></div>`;
+
+    // Recent registrations
+    const recentRegs = myRegs.sort((a, b) => new Date(b.registeredAt) - new Date(a.registeredAt)).slice(0, 4);
+    document.getElementById('recentRegs').innerHTML = recentRegs.length
+      ? recentRegs.map(r => {
+          const badge = r.status === 'confirmed' ? 'badge-success' : r.status === 'pending' ? 'badge-warning' : 'badge-danger';
+          return `
+            <div class="list-item">
+              <div class="item-icon ${r.status === 'confirmed' ? 'green' : 'gold'}">📝</div>
+              <div class="item-info">
+                <div class="item-title">${r.eventName}</div>
+                <div class="item-subtitle">${MonkDB.formatDate(r.eventDate)}</div>
+              </div>
+              <span class="badge ${badge}">${r.status === 'pending' ? 'registered' : r.status}</span>
+            </div>
+          `;
+        }).join('')
+      : `<div class="empty-state" style="padding:30px;"><p>No registrations yet</p></div>`;
+
+    // Recent notifications
+    const recentNotifs = MonkDB.getMyNotifications(user.id).slice(0, 4);
+    document.getElementById('recentNotifs').innerHTML = recentNotifs.length
+      ? recentNotifs.map(n => `
+          <div class="list-item">
+            <div class="item-icon ${n.read ? 'blue' : 'purple'}">${n.icon}</div>
+            <div class="item-info">
+              <div class="item-title">${n.title}</div>
+              <div class="item-subtitle">${MonkDB.formatTime(n.date)}</div>
+            </div>
+            ${!n.read ? '<span class="dot" style="width:8px; height:8px; background:#7c3aed; border-radius:50%;"></span>' : ''}
+          </div>
+        `).join('')
+      : `<div class="empty-state" style="padding:30px;"><p>No notifications</p></div>`;
+  </script>
+</body>
+</html>

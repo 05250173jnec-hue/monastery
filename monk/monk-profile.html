@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Profile - Monastery Events</title>
+  <link rel="stylesheet" href="css/monk.css">
+</head>
+<body>
+  <div class="monk-dashboard">
+    <div id="sidebarMount"></div>
+
+    <main class="monk-main-content">
+      <div id="topbarMount"></div>
+
+      <div class="page-header">
+        <div>
+          <h1>My Profile</h1>
+          <p>Manage your personal information</p>
+        </div>
+      </div>
+
+      <div class="profile-grid">
+        <div class="profile-card">
+          <div class="avatar-wrap">
+            <div class="avatar-lg" id="profileAvatar">KD</div>
+            <button type="button" class="avatar-edit" title="Change photo" aria-label="Change photo" onclick="document.getElementById('photoInput').click()">📷</button>
+          </div>
+          <input type="file" id="photoInput" accept="image/png,image/jpeg,image/webp" hidden onchange="handlePhoto(event)">
+          <div class="photo-actions">
+            <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('photoInput').click()">Update photo</button>
+            <button type="button" class="btn btn-outline btn-sm" id="removePhotoBtn" onclick="removePhoto()" style="display:none;">Remove</button>
+          </div>
+          <h2 id="profileName">Karma Dorji</h2>
+          <div class="profile-role" id="profileRole">Monk</div>
+          <div class="profile-info">
+            <div class="info-row"><span>📧</span> Email <strong id="profileEmail">-</strong></div>
+            <div class="info-row"><span>📱</span> Phone <strong id="profilePhone">-</strong></div>
+            <div class="info-row"><span>🏛️</span> Monastery <strong id="profileMonastery">-</strong></div>
+            <div class="info-row"><span>📅</span> Joined <strong id="profileJoinDate">-</strong></div>
+            <div class="info-row"><span>🆔</span> ID <strong id="profileId">-</strong></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="tabs">
+            <div class="tab active" onclick="switchTab('edit', this)">Edit Profile</div>
+            <div class="tab" onclick="switchTab('password', this)">Change Password</div>
+            <div class="tab" onclick="switchTab('activity', this)">Activity</div>
+          </div>
+
+          <!-- Edit Tab -->
+          <div class="tab-content active" id="tab-edit">
+            <div class="settings-card">
+              <h2>Edit Information</h2>
+              <p class="settings-subtitle">Update your personal details below</p>
+
+              <form onsubmit="saveProfile(event)">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>Full Name</label>
+                    <div class="input-wrapper">
+                      <span class="input-icon">👤</span>
+                      <input type="text" id="editName" required>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label>Email</label>
+                    <div class="input-wrapper">
+                      <span class="input-icon">✉️</span>
+                      <input type="email" id="editEmail" required>
+                    </div>
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>Phone Number</label>
+                    <div class="input-wrapper">
+                      <span class="input-icon">📱</span>
+                      <input type="tel" id="editPhone">
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label>Monastery</label>
+                    <div class="input-wrapper">
+                      <span class="input-icon">🏛️</span>
+                      <input type="text" id="editMonastery">
+                    </div>
+                  </div>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:auto;">Save Changes</button>
+              </form>
+            </div>
+          </div>
+
+          <!-- Password Tab -->
+          <div class="tab-content" id="tab-password">
+            <div class="settings-card">
+              <h2>Change Password</h2>
+              <p class="settings-subtitle">Ensure your account stays secure</p>
+
+              <form onsubmit="savePassword(event)">
+                <div class="form-group">
+                  <label>Current Password</label>
+                  <div class="input-wrapper">
+                    <span class="input-icon">🔒</span>
+                    <input type="password" id="currentPassword" required>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>New Password</label>
+                  <div class="input-wrapper">
+                    <span class="input-icon">🔑</span>
+                    <input type="password" id="newPassword" required minlength="6">
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Confirm New Password</label>
+                  <div class="input-wrapper">
+                    <span class="input-icon">🔒</span>
+                    <input type="password" id="confirmNewPassword" required>
+                  </div>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:auto;">Update Password</button>
+              </form>
+            </div>
+          </div>
+
+          <!-- Activity Tab -->
+          <div class="tab-content" id="tab-activity">
+            <div class="settings-card">
+              <h2>Recent Activity</h2>
+              <p class="settings-subtitle">Your recent registrations</p>
+              <div id="activityList"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="js/monk-data.js"></script>
+  <script src="js/monk-auth.js"></script>
+  <script src="js/monk-app.js"></script>
+  <script>
+    if (!MonkDB.isLoggedIn()) window.location.href = 'monk-login.html';
+
+    document.getElementById('sidebarMount').innerHTML = renderMonkSidebar('profile');
+    
+
+    const user = MonkDB.getCurrentUser();
+
+    function loadProfile() {
+      const initials = user.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+      const av = document.getElementById('profileAvatar');
+      if (/^data:image\/(jpeg|png|webp);base64,/.test(user.photo || '')) {
+        av.textContent = '';
+        av.style.backgroundImage = `url('${user.photo}')`;
+        av.style.backgroundSize = 'cover';
+        av.style.backgroundPosition = 'center';
+        document.getElementById('removePhotoBtn').style.display = '';
+      } else {
+        av.textContent = initials;
+        av.style.backgroundImage = '';
+        document.getElementById('removePhotoBtn').style.display = 'none';
+      }
+      document.getElementById('profileName').textContent = user.name;
+      document.getElementById('profileRole').textContent = user.role === 'monk' ? 'Monk' : 'Participant';
+      document.getElementById('profileEmail').textContent = user.email;
+      document.getElementById('profilePhone').textContent = user.phone || 'Not set';
+      document.getElementById('profileMonastery').textContent = user.monastery || 'Not set';
+      document.getElementById('profileJoinDate').textContent = MonkDB.formatDate(user.joinDate);
+      document.getElementById('profileId').textContent = user.id;
+
+      document.getElementById('editName').value = user.name;
+      document.getElementById('editEmail').value = user.email;
+      document.getElementById('editPhone').value = user.phone || '';
+      document.getElementById('editMonastery').value = user.monastery || '';
+
+      loadActivity();
+    }
+
+    function loadActivity() {
+      const regs = MonkDB.getMyRegistrations(user.id)
+        .sort((a, b) => new Date(b.registeredAt) - new Date(a.registeredAt))
+        .slice(0, 5);
+
+      document.getElementById('activityList').innerHTML = regs.length
+        ? regs.map(r => `
+            <div class="list-item">
+              <div class="item-icon ${r.status === 'confirmed' ? 'green' : 'gold'}">📝</div>
+              <div class="item-info">
+                <div class="item-title">${r.eventName}</div>
+                <div class="item-subtitle">Registered on ${MonkDB.formatDate(r.registeredAt)}</div>
+              </div>
+              <span class="badge ${r.status === 'confirmed' ? 'badge-success' : 'badge-warning'}">${r.status === 'pending' ? 'registered' : r.status}</span>
+            </div>
+          `).join('')
+        : `<p style="color:#8b8ba7; font-size:14px;">No activity yet.</p>`;
+    }
+
+    // Resize + centre-crop the chosen picture to 300x300 so it stays small in localStorage
+    function handlePhoto(e) {
+      const file = e.target.files && e.target.files[0];
+      e.target.value = '';
+      if (!file) return;
+      if (!/^image\/(jpeg|png|webp)$/.test(file.type)) { showToast('Please choose a JPG, PNG or WEBP image', 'error'); return; }
+      if (file.size > 8 * 1024 * 1024) { showToast('Image is too large (max 8 MB)', 'error'); return; }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const size = 300;
+          const c = document.createElement('canvas');
+          c.width = c.height = size;
+          const ctx = c.getContext('2d');
+          const s = Math.min(img.width, img.height);
+          ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, size, size);
+          ctx.drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, size, size);
+          try {
+            MonkDB.updateUser(user.id, { photo: c.toDataURL('image/jpeg', 0.85) });
+          } catch (err) { showToast('Could not save the photo (storage full)', 'error'); return; }
+          showToast('Profile photo updated', 'success');
+          setTimeout(() => location.reload(), 700);
+        };
+        img.onerror = () => showToast('That file is not a valid image', 'error');
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function removePhoto() {
+      if (!confirm('Remove your profile photo?')) return;
+      MonkDB.updateUser(user.id, { photo: '' });
+      showToast('Photo removed', 'success');
+      setTimeout(() => location.reload(), 600);
+    }
+
+    function switchTab(tab, el) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      document.getElementById('tab-' + tab).classList.add('active');
+    }
+
+    function saveProfile(e) {
+      e.preventDefault();
+      const updates = {
+        name: document.getElementById('editName').value.trim(),
+        email: document.getElementById('editEmail').value.trim(),
+        phone: document.getElementById('editPhone').value.trim(),
+        monastery: document.getElementById('editMonastery').value.trim()
+      };
+      MonkDB.updateUser(user.id, updates);
+      showToast('Profile updated successfully', 'success');
+      setTimeout(() => location.reload(), 800);
+    }
+
+    function savePassword(e) {
+      e.preventDefault();
+      const current = document.getElementById('currentPassword').value;
+      const newPass = document.getElementById('newPassword').value;
+      const confirm = document.getElementById('confirmNewPassword').value;
+
+      const users = MonkDB.getUsers();
+      const dbUser = users.find(u => u.id === user.id);
+
+      if (dbUser.password !== current) {
+        showToast('Current password is incorrect', 'error');
+        return;
+      }
+      if (newPass !== confirm) {
+        showToast('New passwords do not match', 'error');
+        return;
+      }
+      if (newPass.length < 6) {
+        showToast('Password must be at least 6 characters', 'error');
+        return;
+      }
+
+      MonkDB.updateUser(user.id, { password: newPass });
+      showToast('Password updated successfully', 'success');
+      e.target.reset();
+    }
+
+    loadProfile();
+  </script>
+</body>
+</html>

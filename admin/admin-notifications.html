@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Notifications - Admin</title>
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+  <div class="admin-dashboard">
+    <div id="sidebarMount"></div>
+    <main class="admin-main-content">
+      <div id="topbarMount"></div>
+
+      <div class="page-header">
+        <div><h1>Notifications</h1><p>Broadcast announcements to users</p></div>
+        <button class="btn btn-primary" onclick="openBroadcastModal()">📢 Send Broadcast</button>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h2>Compose Message</h2></div>
+        <div class="card-body" style="padding:20px;">
+          <div class="form-group"><label>Title</label>
+            <div class="input-wrapper"><span class="input-icon">📌</span><input type="text" id="nTitle" placeholder="Notification title"></div>
+          </div>
+          <div class="form-group"><label>Message</label>
+            <textarea id="nMsg" rows="3" style="width:100%; padding:12px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:14px; resize:vertical;" placeholder="Message content..."></textarea>
+          </div>
+          <button class="btn btn-primary" style="width:auto;" onclick="sendBroadcast()">📢 Send to All Users</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:20px;">
+        <div class="card-header"><h2>All User Notifications</h2></div>
+        <div class="card-body" id="allNotifs"></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="js/admin-data.js"></script>
+  <script src="js/admin-auth.js"></script>
+  <script src="js/admin-app.js"></script>
+  <script>
+    if (!AdminDB.isLoggedIn()) window.location.href = 'admin-login.html';
+    document.getElementById('sidebarMount').innerHTML = renderAdminSidebar('notifications');
+    
+
+    function renderNotifs() {
+      const notifs = JSON.parse(localStorage.getItem(AdminDB.KEYS.NOTIFICATIONS) || '[]')
+        .sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0, 30);
+      document.getElementById('allNotifs').innerHTML = notifs.map(n => `
+        <div class="list-item">
+          <div class="item-icon ${n.type === 'success' ? 'green' : n.type === 'warning' ? 'orange' : 'blue'}">${n.icon}</div>
+          <div class="item-info">
+            <div class="item-title">${n.title}</div>
+            <div class="item-subtitle">${n.message}</div>
+            <div style="font-size:11px; color:#94a3b8; margin-top:4px;">To: ${n.userId} · ${AdminDB.formatTime(n.date)}</div>
+          </div>
+        </div>
+      `).join('') || '<div class="empty-state"><p>No notifications</p></div>';
+    }
+
+    function sendBroadcast() {
+      const title = document.getElementById('nTitle').value.trim();
+      const message = document.getElementById('nMsg').value.trim();
+      if (!title || !message) { showToast('Title and message required', 'error'); return; }
+      AdminDB.broadcastNotification({ title, message, type: 'info', icon: '📢' });
+      showToast('Broadcast sent to all users', 'success');
+      document.getElementById('nTitle').value = '';
+      document.getElementById('nMsg').value = '';
+      renderNotifs();
+    }
+
+    function openBroadcastModal() {
+      document.getElementById('nTitle').focus();
+    }
+
+    renderNotifs();
+  </script>
+</body>
+</html>

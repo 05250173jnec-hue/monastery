@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Create Account — MEMS Participant Portal</title>
+  <link rel="stylesheet" href="css/monk.css" />
+  <style>
+    /* Warm Crimson & Gold Palette matching hero.jpg */
+    body.auth-page {
+      min-height: 100vh;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background:
+        linear-gradient(135deg, rgba(69, 10, 10, 0.72) 0%, rgba(28, 12, 8, 0.80) 100%),
+        url('../images/hero.jpg') no-repeat center center / cover;
+      background-attachment: fixed;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 1.5rem;
+      box-sizing: border-box;
+    }
+
+    .auth-card {
+      background: rgba(255, 253, 249, 0.97);
+      width: 100%;
+      max-width: 420px;
+      border-radius: 20px;
+      padding: 2.25rem 2rem;
+      border-top: 4px solid #b45309;
+      box-shadow: 0 24px 48px rgba(0, 0, 0, 0.45);
+      box-sizing: border-box;
+    }
+
+    /* Centered Header Section */
+    .auth-header-centered {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1.25rem;
+      border-bottom: 1px solid #eadfd3;
+    }
+
+    .auth-icon-circle {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+      border: 1px solid #f59e0b;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .auth-title {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #450a0a;
+      margin: 0 0 0.25rem 0;
+    }
+
+    .auth-subtitle {
+      font-size: 0.9rem;
+      color: #78716c;
+      margin: 0;
+    }
+
+    /* Form Controls */
+    .form-group {
+      margin-bottom: 1.15rem;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #292524;
+      margin-bottom: 0.4rem;
+    }
+
+    .input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .input-icon {
+      position: absolute;
+      left: 14px;
+      font-size: 1rem;
+      color: #78716c;
+      pointer-events: none;
+    }
+
+    .input-wrapper input {
+      width: 100%;
+      padding: 0.75rem 0.9rem 0.75rem 2.5rem;
+      border: 1px solid #d6ccc2;
+      border-radius: 10px;
+      font-size: 0.92rem;
+      color: #1c1917;
+      background-color: #faf7f2;
+      transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
+      box-sizing: border-box;
+    }
+
+    .input-wrapper input:focus {
+      outline: none;
+      border-color: #991b1b;
+      background-color: #ffffff;
+      box-shadow: 0 0 0 3px rgba(153, 27, 27, 0.14);
+    }
+
+    .btn-submit {
+      width: 100%;
+      padding: 0.85rem;
+      margin-top: 0.5rem;
+      background: linear-gradient(135deg, #991b1b 0%, #7f1d1d 100%);
+      color: #ffffff;
+      border: none;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 6px 16px rgba(127, 29, 29, 0.28);
+      transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+    }
+
+    .btn-submit:hover {
+      background: linear-gradient(135deg, #7f1d1d 0%, #651212 100%);
+      box-shadow: 0 8px 20px rgba(127, 29, 29, 0.36);
+    }
+
+    .btn-submit:active {
+      transform: scale(0.99);
+    }
+
+    .auth-footer {
+      text-align: center;
+      margin-top: 1.35rem;
+      font-size: 0.85rem;
+      color: #57534e;
+    }
+
+    .auth-footer a {
+      color: #991b1b;
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .auth-footer a:hover {
+      color: #b45309;
+      text-decoration: underline;
+    }
+
+    .error-msg {
+      color: #991b1b;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      padding: 0.65rem 0.85rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      margin-bottom: 1rem;
+      display: none;
+      text-align: center;
+    }
+  </style>
+</head>
+<body class="auth-page">
+
+  <div class="auth-card">
+    <!-- Centered Header -->
+    <div class="auth-header-centered">
+      <div class="auth-icon-circle">📝</div>
+      <h2 class="auth-title">Create Account</h2>
+      <p class="auth-subtitle">Register as a participant</p>
+    </div>
+
+    <div id="registerError" class="error-msg"></div>
+
+    <!-- Registration Form -->
+    <form id="registerForm">
+      <div class="form-group">
+        <label for="fullName">Full Name</label>
+        <div class="input-wrapper">
+          <span class="input-icon">👤</span>
+          <input
+            type="text"
+            id="fullName"
+            name="fullName"
+            placeholder="Karma Dorji"
+            required
+          />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="email">Email Address</label>
+        <div class="input-wrapper">
+          <span class="input-icon">✉️</span>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            placeholder="you@monastery.bt"
+            required
+          />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <div class="input-wrapper">
+          <span class="input-icon">🔒</span>
+          <input
+            type="password"
+            id="password"
+            name="password"
+            placeholder="Minimum 6 characters"
+            minlength="6"
+            required
+          />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="confirmPassword">Confirm Password</label>
+        <div class="input-wrapper">
+          <span class="input-icon">🔒</span>
+          <input
+            type="password"
+            id="confirmPassword"
+            name="confirmPassword"
+            placeholder="Re-enter password"
+            minlength="6"
+            required
+          />
+        </div>
+      </div>
+
+      <button type="submit" class="btn-submit">Create Account</button>
+    </form>
+
+    <div class="auth-footer">
+      &larr; Already have an account? <a href="monk-login.html">Login</a>
+    </div>
+  </div>
+
+  <script src="js/monk-data.js"></script>
+  <script src="js/monk-auth.js"></script>
+</body>
+</html>

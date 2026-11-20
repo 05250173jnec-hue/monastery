@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Volunteers & Tasks - Admin</title>
+  <link rel="stylesheet" href="css/admin.css">
+  <style>
+    .call-card { padding:18px 20px; border-bottom:1px solid #f1f5f9; }
+    .call-card:last-child { border-bottom:none; }
+    .call-top { display:flex; justify-content:space-between; gap:14px; align-items:flex-start; flex-wrap:wrap; }
+    .call-title { font-size:15px; font-weight:800; }
+    .call-meta { font-size:12px; color:#94a3b8; margin-top:3px; }
+    .call-desc { font-size:13px; margin:10px 0; color:#475569; }
+    .meter { height:8px; background:#eef2f7; border-radius:6px; overflow:hidden; margin:8px 0 4px; max-width:360px; }
+    .meter > div { height:100%; background:#22c55e; border-radius:6px; }
+    .call-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+    .app-row { padding:12px 0; border-bottom:1px solid #f1f5f9; }
+    .app-row:last-child { border-bottom:none; }
+    .app-msg { font-size:12px; color:#64748b; background:#f8fafc; border-radius:8px; padding:8px 10px; margin-top:6px; }
+    .view-tab { display:none; } .view-tab.active { display:block; }
+  </style>
+</head>
+<body>
+  <div class="admin-dashboard">
+    <div id="sidebarMount"></div>
+    <main class="admin-main-content">
+      <div id="topbarMount"></div>
+
+      <div class="page-header">
+        <div>
+          <h1>Volunteers & Tasks</h1>
+          <p>Announce what you need, approve volunteers and give them tasks</p>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-primary" onclick="openCallModal()">📢 Announce Need</button>
+          <button class="btn btn-outline" onclick="openTaskModal()">+ Add Task</button>
+          <button class="btn btn-outline" onclick="openVolunteerModal()">+ Add Volunteer</button>
+        </div>
+      </div>
+
+      <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);">
+        <div class="stat-card"><div class="stat-value" id="volTotal">0</div><div class="stat-label">Total Volunteers</div></div>
+        <div class="stat-card"><div class="stat-value" id="callsOpen" style="color:#2563eb;">0</div><div class="stat-label">Open Calls</div></div>
+        <div class="stat-card"><div class="stat-value" id="appsPending" style="color:#f59e0b;">0</div><div class="stat-label">Applications to Review</div></div>
+        <div class="stat-card"><div class="stat-value" id="taskDone" style="color:#8b5cf6;">0</div><div class="stat-label">Tasks Completed</div></div>
+      </div>
+
+      <div class="tabs">
+        <div class="tab active" id="tabBtnCalls" onclick="switchView('calls')">📢 Volunteer Calls</div>
+        <div class="tab" id="tabBtnTeam" onclick="switchView('team')">👥 Volunteers & Tasks</div>
+      </div>
+
+      <!-- ===== CALLS ===== -->
+      <div class="view-tab active" id="view-calls">
+        <div class="card"><div id="callsList"></div></div>
+      </div>
+
+      <!-- ===== TEAM + TASKS ===== -->
+      <div class="view-tab" id="view-team">
+        <div class="content-grid">
+          <div class="card">
+            <div class="card-header"><h2>Volunteers</h2></div>
+            <div class="card-body" id="volunteersList"></div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <h2>Task Board</h2>
+              <span style="font-size:12px; color:#94a3b8;">To Do → In Progress → Done</span>
+            </div>
+            <div class="card-body" id="taskBoard"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="js/admin-data.js"></script>
+  <script src="js/admin-auth.js"></script>
+  <script src="js/admin-app.js"></script>
+  <script>
+    if (!AdminDB.isLoggedIn()) window.location.href = 'admin-login.html';
+    document.getElementById('sidebarMount').innerHTML = renderAdminSidebar('volunteers');
+
+    const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+    function switchView(v) {
+      document.getElementById('view-calls').classList.toggle('active', v === 'calls');
+      document.getElementById('view-team').classList.toggle('active', v === 'team');
+      document.getElementById('tabBtnCalls').classList.toggle('active', v === 'calls');
+      document.getElementById('tabBtnTeam').classList.toggle('active', v === 'team');
+    }
+
+    function renderAll() {
+      const vols = AdminDB.getVolunteers();
+      const tasks = AdminDB.getTasks();
+      const calls = AdminDB.getCalls();
+      const apps = AdminDB.getApplications();
+
+      document.getElementById('volTotal').textContent = vols.length;
+      document.getElementById('callsOpen').textContent = calls.filter(c => AdminDB.callStats(c).open).length;
+      document.getElementById('appsPending').textContent = apps.filter(a => a.status === 'pending').length;
+      document.getElementById('taskDone').textContent = tasks.filter(t => t.status === 'done').length + ' / ' + tasks.length;
+
+      renderCalls(calls);
+      renderTeam(vols, tasks);
+    }
+
+    // ---------------- CALLS ----------------
+    function renderCalls(calls) {
+      const sorted = [...calls].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+      document.getElementById('callsList').innerHTML = sorted.length ? sorted.map(c => {
+        const st = AdminDB.callStats(c);
+        const label = st.filled ? 'filled' : st.expired ? 'deadline passed' : c.status === 'closed' ? 'closed' : 'open';
+        const badge = st.open ? 'badge-success' : st.filled ? 'badge-purple' : 'badge-secondary';
+        const pct = Math.min(100, Math.round(st.approved / c.needed * 100));
+        return `
+          <div class="call-card">
+            <div class="call-top">
+              <div>
+                <div class="call-title">📢 ${esc(c.title)}</div>
+                <div class="call-meta">${esc(c.role)}${c.eventName ? ' · ' + esc(c.eventName) : ''}${c.deadline ? ' · apply by ' + AdminDB.formatDate(c.deadline) : ''}</div>
+              </div>
+              <span class="badge ${badge}">${label}</span>
+            </div>
+            ${c.description ? `<div class="call-desc">${esc(c.description)}</div>` : ''}
+            <div style="font-size:13px;"><strong>${st.approved}</strong> of <strong>${c.needed}</strong> volunteers approved${st.pending ? ` · <span style="color:#f59e0b; font-weight:700;">${st.pending} to review</span>` : ''}</div>
+            <div class="meter"><div style="width:${pct}%"></div></div>
+            <div class="call-actions">
+              <button class="btn btn-primary btn-sm" onclick="openApplicants('${esc(c.id)}')">👥 Applicants (${st.total})</button>
+              <button class="btn btn-outline btn-sm" onclick="toggleCall('${esc(c.id)}')">${c.status === 'open' ? '⏸ Close' : '▶ Reopen'}</button>
+              <button class="btn btn-outline btn-sm" onclick="deleteCall('${esc(c.id)}')">🗑️ Delete</button>
+            </div>
+          </div>`;
+      }).join('') : '<div class="empty-state" style="padding:40px;"><p>No calls yet. Press <strong>📢 Announce Need</strong> to ask for volunteers.</p></div>';
+    }
+
+    function openCallModal() {
+      const events = AdminDB.getEvents().filter(e => e.status !== 'completed');
+      openModal('callModal', `
+        <div class="modal">
+          <div class="modal-header"><h3>📢 Announce Volunteer Need</h3><button class="modal-close" onclick="closeModal('callModal')">✕</button></div>
+          <div class="modal-body">
+            <div class="form-group"><label>What do you need help with?</label>
+              <div class="input-wrapper"><span class="input-icon">📢</span><input type="text" id="cTitle" placeholder="e.g. Kitchen helpers for the festival"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label>Volunteers needed</label>
+                <div class="input-wrapper"><span class="input-icon">👥</span><input type="number" id="cNeeded" min="1" value="5"></div>
+              </div>
+              <div class="form-group"><label>Role</label>
+                <div class="input-wrapper"><span class="input-icon">🏷️</span>
+                  <select id="cRole"><option>General Volunteer</option><option>Event Coordinator</option><option>Logistics Lead</option><option>Catering Team</option><option>Decoration Team</option><option>Security Team</option></select>
+                </div>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label>Related event</label>
+                <div class="input-wrapper"><span class="input-icon">📅</span>
+                  <select id="cEvent"><option value="">None</option>${events.map(e => `<option value="${esc(e.id)}">${esc(e.name)}</option>`).join('')}</select>
+                </div>
+              </div>
+              <div class="form-group"><label>Apply by (optional)</label>
+                <div class="input-wrapper"><span class="input-icon">📆</span><input type="date" id="cDeadline"></div>
+              </div>
+            </div>
+            <div class="form-group"><label>Details</label>
+              <div class="input-wrapper"><textarea id="cDesc" rows="3" style="width:100%; padding:12px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:14px;" placeholder="What will volunteers do? When and where?"></textarea></div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('callModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="saveCall()">Announce to everyone</button>
+          </div>
+        </div>`);
+    }
+
+    function saveCall() {
+      const data = {
+        title: document.getElementById('cTitle').value.trim(),
+        needed: document.getElementById('cNeeded').value,
+        role: document.getElementById('cRole').value,
+        eventId: document.getElementById('cEvent').value,
+        deadline: document.getElementById('cDeadline').value,
+        description: document.getElementById('cDesc').value.trim()
+      };
+      if (!data.title) { showToast('Please say what you need help with', 'error'); return; }
+      const res = AdminDB.addCall(data);
+      showToast(`Announced - ${res.notified} users notified`, 'success');
+      closeModal('callModal');
+      renderAll();
+    }
+
+    function toggleCall(id) {
+      const c = AdminDB.getCalls().find(x => x.id === id);
+      AdminDB.updateCall(id, { status: c.status === 'open' ? 'closed' : 'open' });
+      renderAll();
+    }
+
+    function deleteCall(id) {
+      if (confirm('Delete this call and all its applications?')) { AdminDB.deleteCall(id); renderAll(); }
+    }
+
+    function openApplicants(callId) {
+      const c = AdminDB.getCalls().find(x => x.id === callId);
+      if (!c) return;
+      const st = AdminDB.callStats(c);
+      const apps = AdminDB.getApplications(callId).sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+      openModal('appModal', `
+        <div class="modal" style="max-width:600px;">
+          <div class="modal-header"><h3>Applicants · ${esc(c.title)}</h3><button class="modal-close" onclick="closeModal('appModal')">✕</button></div>
+          <div class="modal-body">
+            <div style="font-size:13px; color:#94a3b8; margin-bottom:10px;">${st.approved} / ${c.needed} approved</div>
+            ${apps.length ? apps.map(a => {
+              const b = a.status === 'approved' ? 'badge-success' : a.status === 'rejected' ? 'badge-danger' : 'badge-warning';
+              return `
+              <div class="app-row">
+                <div style="display:flex; justify-content:space-between; gap:10px; align-items:center;">
+                  <div>
+                    <div style="font-weight:700;">${esc(a.userName)} <span class="badge ${b}">${esc(a.status)}</span></div>
+                    <div style="font-size:12px; color:#94a3b8;">${esc(a.email)}${a.phone ? ' · ' + esc(a.phone) : ''} · applied ${AdminDB.formatDate(a.createdAt)}</div>
+                  </div>
+                  <div style="white-space:nowrap;">
+                    ${a.status !== 'approved' ? `<button class="btn-icon success" title="Approve" onclick="review('${esc(a.id)}','approved','${esc(callId)}')">✅</button>` : ''}
+                    ${a.status !== 'rejected' ? `<button class="btn-icon danger" title="Reject" onclick="review('${esc(a.id)}','rejected','${esc(callId)}')">🚫</button>` : ''}
+                  </div>
+                </div>
+                ${a.availability ? `<div class="app-msg"><b>Available:</b> ${esc(a.availability)}</div>` : ''}
+                ${a.message ? `<div class="app-msg">“${esc(a.message)}”</div>` : ''}
+              </div>`; }).join('') : '<div class="empty-state"><p>No applications yet</p></div>'}
+          </div>
+        </div>`);
+    }
+
+    function review(appId, status, callId) {
+      const res = AdminDB.reviewApplication(appId, status);
+      if (!res.success) { showToast(res.message || 'Could not update', 'error'); return; }
+      showToast(status === 'approved' ? 'Approved - they are now a volunteer' : 'Application rejected', status === 'approved' ? 'success' : 'warning');
+      openApplicants(callId);
+      renderAll();
+    }
+
+    // ---------------- TEAM + TASKS ----------------
+    function renderTeam(vols, tasks) {
+      document.getElementById('volunteersList').innerHTML = vols.length ? vols.map(v => {
+        const initials = v.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+        const statusClass = v.status === 'active' ? 'badge-success' : v.status === 'on-leave' ? 'badge-warning' : 'badge-secondary';
+        const mine = tasks.filter(t => t.volunteerId === v.id);
+        return `
+          <div class="list-item">
+            <div style="width:42px; height:42px; border-radius:50%; background:linear-gradient(135deg,#2563eb,#60a5fa); color:white; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; flex-shrink:0;">${esc(initials)}</div>
+            <div class="item-info">
+              <div class="item-title">${esc(v.name)}</div>
+              <div class="item-subtitle">${esc(v.role)} · ${mine.filter(t => t.status !== 'done').length} active / ${mine.length} tasks${v.userId ? ' · 🔗 has portal account' : ''}</div>
+            </div>
+            <span class="badge ${statusClass}">${esc(v.status)}</span>
+            <button class="btn-icon" title="Assign a task" onclick="openTaskModal('${esc(v.id)}')">📋</button>
+            <button class="btn-icon danger" onclick="deleteVol('${esc(v.id)}')">🗑️</button>
+          </div>`;
+      }).join('') : '<div class="empty-state"><p>No volunteers yet</p></div>';
+
+      const taskStatuses = ['todo', 'in-progress', 'done'];
+      document.getElementById('taskBoard').innerHTML = taskStatuses.map(status => {
+        const items = tasks.filter(t => t.status === status);
+        const label = status === 'todo' ? 'To Do' : status === 'in-progress' ? 'In Progress' : 'Done';
+        const color = status === 'done' ? '#22c55e' : status === 'in-progress' ? '#3b82f6' : '#f59e0b';
+        return `
+          <div style="margin-bottom:16px;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+              <span style="width:8px; height:8px; border-radius:50%; background:${color};"></span>
+              <strong style="font-size:13px;">${label}</strong>
+              <span style="font-size:11px; color:#94a3b8;">(${items.length})</span>
+            </div>
+            ${items.length ? items.map(t => `
+              <div style="padding:12px; background:#f8fafc; border-radius:8px; margin-bottom:8px; border-left:3px solid ${color};">
+                <div style="display:flex; justify-content:space-between; align-items:start; gap:8px;">
+                  <div style="flex:1;">
+                    <div style="font-size:13px; font-weight:700;">${esc(t.title)}</div>
+                    <div style="font-size:11px; color:#94a3b8; margin-top:2px;">${t.open && !t.volunteerId ? '<b style="color:#f59e0b;">🔓 Open - waiting for a volunteer</b>' : esc(t.assignee)} · ${esc(t.eventName) || 'No event'}${t.dueDate ? ' · due ' + AdminDB.formatDate(t.dueDate) : ''}</div>
+                  </div>
+                  <div style="display:flex; gap:2px;">
+                    ${status !== 'done' ? `<button class="btn-icon success" onclick="nextTaskStatus('${esc(t.id)}')" title="Move forward">→</button>` : ''}
+                    <button class="btn-icon danger" onclick="deleteTask('${esc(t.id)}')">🗑️</button>
+                  </div>
+                </div>
+              </div>`).join('') : `<div style="font-size:12px; color:#94a3b8; padding:8px;">No tasks</div>`}
+          </div>`;
+      }).join('');
+    }
+
+    function nextTaskStatus(id) {
+      const task = AdminDB.getTasks().find(t => t.id === id);
+      if (!task) return;
+      const flow = { todo: 'in-progress', 'in-progress': 'done', done: 'done' };
+      AdminDB.updateTask(id, { status: flow[task.status] });
+      renderAll();
+    }
+
+    function openVolunteerModal() {
+      openModal('volModal', `
+        <div class="modal">
+          <div class="modal-header"><h3>Add Volunteer</h3><button class="modal-close" onclick="closeModal('volModal')">✕</button></div>
+          <div class="modal-body">
+            <div class="form-group"><label>Full Name</label>
+              <div class="input-wrapper"><span class="input-icon">👤</span><input type="text" id="vName" placeholder="Karma Dorji"></div>
+            </div>
+            <div class="form-group"><label>Email (use their portal email so they can see their tasks)</label>
+              <div class="input-wrapper"><span class="input-icon">✉️</span><input type="email" id="vEmail" placeholder="karma@monastery.bt"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label>Phone</label>
+                <div class="input-wrapper"><span class="input-icon">📱</span><input type="tel" id="vPhone" placeholder="+975 17..."></div>
+              </div>
+              <div class="form-group"><label>Role</label>
+                <div class="input-wrapper"><span class="input-icon">🏷️</span>
+                  <select id="vRole"><option>General Volunteer</option><option>Event Coordinator</option><option>Logistics Lead</option><option>Catering Team</option><option>Decoration Team</option><option>Security Team</option></select>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('volModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="saveVolunteer()">Add Volunteer</button>
+          </div>
+        </div>`);
+    }
+
+    function saveVolunteer() {
+      const data = {
+        name: document.getElementById('vName').value.trim(),
+        email: document.getElementById('vEmail').value.trim(),
+        phone: document.getElementById('vPhone').value.trim(),
+        role: document.getElementById('vRole').value
+      };
+      if (!data.name || !data.email) { showToast('Name and email required', 'error'); return; }
+      AdminDB.addVolunteer(data);
+      showToast('Volunteer added', 'success');
+      closeModal('volModal');
+      renderAll();
+    }
+
+    function deleteVol(id) {
+      if (confirm('Remove this volunteer?')) { AdminDB.deleteVolunteer(id); showToast('Volunteer removed', 'warning'); renderAll(); }
+    }
+
+    function openTaskModal(preVolId) {
+      const vols = AdminDB.getVolunteers();
+      const events = AdminDB.getEvents();
+      openModal('taskModal', `
+        <div class="modal">
+          <div class="modal-header"><h3>Create Task</h3><button class="modal-close" onclick="closeModal('taskModal')">✕</button></div>
+          <div class="modal-body">
+            <div class="form-group"><label>Task Title</label>
+              <div class="input-wrapper"><span class="input-icon">📋</span><input type="text" id="tTitle" placeholder="Set up decorations"></div>
+            </div>
+            <div class="form-group"><label>Details (optional)</label>
+              <div class="input-wrapper"><textarea id="tDesc" rows="2" style="width:100%; padding:12px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:14px;" placeholder="What exactly should be done?"></textarea></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label>Give to</label>
+                <div class="input-wrapper"><span class="input-icon">👤</span>
+                  <select id="tAssignee">
+                    <option value="">🔓 Open - volunteers can pick it up</option>
+                    ${vols.map(v => `<option value="${esc(v.id)}" ${v.id === preVolId ? 'selected' : ''}>${esc(v.name)} (${esc(v.role)})</option>`).join('')}
+                  </select>
+                </div>
+              </div>
+              <div class="form-group"><label>Priority</label>
+                <div class="input-wrapper"><span class="input-icon">⚡</span>
+                  <select id="tPriority"><option>low</option><option selected>medium</option><option>high</option></select>
+                </div>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label>Related Event</label>
+                <div class="input-wrapper"><span class="input-icon">📅</span>
+                  <select id="tEvent"><option value="">None</option>${events.map(e => `<option value="${esc(e.id)}">${esc(e.name)}</option>`).join('')}</select>
+                </div>
+              </div>
+              <div class="form-group"><label>Due Date</label>
+                <div class="input-wrapper"><span class="input-icon">📆</span><input type="date" id="tDue"></div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('taskModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="saveTask()">Create Task</button>
+          </div>
+        </div>`);
+    }
+
+    function saveTask() {
+      const data = {
+        title: document.getElementById('tTitle').value.trim(),
+        description: document.getElementById('tDesc').value.trim(),
+        volunteerId: document.getElementById('tAssignee').value,
+        eventId: document.getElementById('tEvent').value,
+        priority: document.getElementById('tPriority').value,
+        dueDate: document.getElementById('tDue').value
+      };
+      if (!data.title) { showToast('Task title required', 'error'); return; }
+      AdminDB.addTask(data);
+      showToast(data.volunteerId ? 'Task assigned' : 'Open task posted for volunteers', 'success');
+      closeModal('taskModal');
+      switchView('team');
+      renderAll();
+    }
+
+    function deleteTask(id) {
+      if (confirm('Delete this task?')) { AdminDB.deleteTask(id); renderAll(); }
+    }
+
+    renderAll();
+  </script>
+</body>
+</html>

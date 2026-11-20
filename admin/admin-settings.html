@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings - Admin</title>
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+  <div class="admin-dashboard">
+    <div id="sidebarMount"></div>
+    <main class="admin-main-content">
+      <div id="topbarMount"></div>
+
+      <div class="page-header">
+        <div><h1>Settings</h1><p>Configure your monastery system</p></div>
+        <button class="btn btn-primary" onclick="saveAll()">Save Changes</button>
+      </div>
+
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab('general', this)">General</div>
+        <div class="tab" onclick="switchTab('notifications', this)">Notifications</div>
+        <div class="tab" onclick="switchTab('security', this)">Security</div>
+      </div>
+
+      <div class="tab-content active" id="tab-general">
+        <div class="card">
+          <div class="card-header"><h2>Organisation Information</h2></div>
+          <div class="card-body" style="padding:24px;">
+            <div class="form-row">
+              <div class="form-group"><label>Organisation Name</label>
+                <div class="input-wrapper"><span class="input-icon">🏛️</span><input type="text" id="orgName"></div>
+              </div>
+              <div class="form-group"><label>Email Address</label>
+                <div class="input-wrapper"><span class="input-icon">✉️</span><input type="email" id="orgEmail"></div>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label>Phone</label>
+                <div class="input-wrapper"><span class="input-icon">📱</span><input type="tel" id="orgPhone"></div>
+              </div>
+              <div class="form-group"><label>Location</label>
+                <div class="input-wrapper"><span class="input-icon">📍</span><input type="text" id="orgLocation"></div>
+              </div>
+            </div>
+            <div class="form-group"><label>Website</label>
+              <div class="input-wrapper"><span class="input-icon">🌐</span><input type="url" id="orgWebsite"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-content" id="tab-notifications">
+        <div class="card">
+          <div class="card-header"><h2>Notification Preferences</h2></div>
+          <div class="card-body" style="padding:24px;">
+            <div id="notifPrefs"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-content" id="tab-security">
+        <div class="card" style="margin-bottom:20px;">
+          <div class="card-header"><h2>🔑 Change Password</h2></div>
+          <div class="card-body" style="padding:24px;">
+            <p style="font-size:13px; color:#94a3b8; margin-bottom:18px;">Signed in as <strong id="pwAdminEmail"></strong>. Use at least 6 characters.</p>
+            <form onsubmit="changeAdminPassword(event)" autocomplete="off">
+              <div class="form-group"><label>Current Password</label>
+                <div class="input-wrapper"><span class="input-icon">🔒</span><input type="password" id="pwCurrent" required autocomplete="current-password"></div>
+              </div>
+              <div class="form-row">
+                <div class="form-group"><label>New Password</label>
+                  <div class="input-wrapper"><span class="input-icon">🔑</span><input type="password" id="pwNew" required minlength="6" autocomplete="new-password"></div>
+                </div>
+                <div class="form-group"><label>Confirm New Password</label>
+                  <div class="input-wrapper"><span class="input-icon">🔑</span><input type="password" id="pwConfirm" required autocomplete="new-password"></div>
+                </div>
+              </div>
+              <label style="display:flex; gap:8px; align-items:center; font-size:13px; margin-bottom:16px; cursor:pointer;">
+                <input type="checkbox" onchange="['pwCurrent','pwNew','pwConfirm'].forEach(i => document.getElementById(i).type = this.checked ? 'text' : 'password')"> Show passwords
+              </label>
+              <button type="submit" class="btn btn-primary" style="width:auto;">Update Password</button>
+            </form>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><h2>Security Settings</h2></div>
+          <div class="card-body" style="padding:24px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:14px 0; border-bottom:1px solid #f1f5f9;">
+              <div>
+                <div style="font-weight:700; font-size:14px;">Two-Factor Authentication</div>
+                <div style="font-size:12px; color:#94a3b8;">Add extra security layer</div>
+              </div>
+              <div class="toggle" id="tog-twoFactor" onclick="togglePref('twoFactor')"></div>
+            </div>
+            <div style="margin-top:20px; padding:16px; background:#fef2f2; border-radius:8px; border:1px solid #fecaca;">
+              <div style="font-weight:700; color:#b91c1c; font-size:14px;">⚠️ Danger Zone</div>
+              <p style="font-size:12px; color:#94a3b8; margin:6px 0 12px;">Reset all system data. This cannot be undone.</p>
+              <button class="btn btn-danger btn-sm" onclick="resetSystem()">Reset System</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="js/admin-data.js"></script>
+  <script src="js/admin-auth.js"></script>
+  <script src="js/admin-app.js"></script>
+  <script>
+    if (!AdminDB.isLoggedIn()) window.location.href = 'admin-login.html';
+    document.getElementById('sidebarMount').innerHTML = renderAdminSidebar('settings');
+    
+    const settings = AdminDB.getSettings();
+
+    // Notification toggles (rendered by script - it used to sit in the HTML as raw text)
+    document.getElementById('notifPrefs').innerHTML = [
+      { key: 'emailNotifications', label: 'Email notifications' },
+      { key: 'newRegistrations', label: 'New registration alerts' },
+      { key: 'donationAlerts', label: 'Donation alerts' },
+      { key: 'taskReminders', label: 'Task reminders' },
+      { key: 'systemUpdates', label: 'System updates' }
+    ].map(item => `
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:14px 0; border-bottom:1px solid #f1f5f9;">
+        <span style="font-size:14px;">${item.label}</span>
+        <div class="toggle" id="tog-${item.key}" onclick="togglePref('${item.key}')"></div>
+      </div>`).join('');
+
+    document.getElementById('pwAdminEmail').textContent = (AdminDB.getCurrentUser() || {}).email || '';
+
+    document.getElementById('orgName').value = settings.orgName || '';
+    document.getElementById('orgEmail').value = settings.email || '';
+    document.getElementById('orgPhone').value = settings.phone || '';
+    document.getElementById('orgLocation').value = settings.location || '';
+    document.getElementById('orgWebsite').value = settings.website || '';
+
+    // Init toggles
+    ['emailNotifications','newRegistrations','donationAlerts','taskReminders','systemUpdates','twoFactor'].forEach(k => {
+      const el = document.getElementById('tog-' + k);
+      if (el && settings[k]) el.classList.add('active');
+    });
+
+    function switchTab(tab, el) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      document.getElementById('tab-' + tab).classList.add('active');
+    }
+
+    // Open the Security tab when coming from the sidebar account card (#security)
+    if (location.hash === '#security') {
+      const t = [...document.querySelectorAll('.tab')].find(x => /Security/.test(x.textContent));
+      if (t) switchTab('security', t);
+    }
+
+    function changeAdminPassword(e) {
+      e.preventDefault();
+      const cur = document.getElementById('pwCurrent').value;
+      const nw = document.getElementById('pwNew').value;
+      const cf = document.getElementById('pwConfirm').value;
+      if (nw !== cf) { showToast('New passwords do not match', 'error'); return; }
+      const res = AdminDB.changePassword(cur, nw);
+      if (!res.success) { showToast(res.message, 'error'); return; }
+      showToast('Password changed. Use it next time you log in.', 'success');
+      e.target.reset();
+    }
+
+    function togglePref(key) {
+      document.getElementById('tog-' + key).classList.toggle('active');
+    }
+
+    function saveAll() {
+      const data = {
+        orgName: document.getElementById('orgName').value,
+        email: document.getElementById('orgEmail').value,
+        phone: document.getElementById('orgPhone').value,
+        location: document.getElementById('orgLocation').value,
+        website: document.getElementById('orgWebsite').value,
+        emailNotifications: document.getElementById('tog-emailNotifications').classList.contains('active'),
+        newRegistrations: document.getElementById('tog-newRegistrations').classList.contains('active'),
+        donationAlerts: document.getElementById('tog-donationAlerts').classList.contains('active'),
+        taskReminders: document.getElementById('tog-taskReminders').classList.contains('active'),
+        systemUpdates: document.getElementById('tog-systemUpdates').classList.contains('active'),
+        twoFactor: document.getElementById('tog-twoFactor').classList.contains('active')
+      };
+      AdminDB.saveSettings(data);
+      showToast('Settings saved successfully', 'success');
+    }
+
+    function resetSystem() {
+      if (confirm('⚠️ This will delete ALL data (events, users, donations, etc). Continue?')) {
+        if (confirm('This is permanent. Are you absolutely sure?')) {
+          localStorage.clear();
+          showToast('System reset. Reloading...', 'warning');
+          setTimeout(() => window.location.href = 'admin-login.html', 1500);
+        }
+      }
+    }
+  </script>
+</body>
+</html>

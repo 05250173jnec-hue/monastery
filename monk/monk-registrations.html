@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Registrations - Monastery Events</title>
+  <link rel="stylesheet" href="css/monk.css">
+</head>
+<body>
+  <div class="monk-dashboard">
+    <div id="sidebarMount"></div>
+
+    <main class="monk-main-content">
+      <div id="topbarMount"></div>
+
+      <div class="page-header">
+        <div>
+          <h1>My Registrations</h1>
+          <p>Track all your event registrations in one place</p>
+        </div>
+      </div>
+
+      <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);" id="regStats"></div>
+
+      <div id="regListContainer"></div>
+    </main>
+  </div>
+
+  <script src="js/monk-data.js"></script>
+  <script src="js/monk-auth.js"></script>
+  <script src="js/monk-app.js"></script>
+  <script>
+    if (!MonkDB.isLoggedIn()) window.location.href = 'monk-login.html';
+
+    document.getElementById('sidebarMount').innerHTML = renderMonkSidebar('registrations');
+   
+
+    const user = MonkDB.getCurrentUser();
+
+    function renderStats() {
+      const regs = MonkDB.getMyRegistrations(user.id).filter(r => r.status !== 'cancelled');
+      document.getElementById('regStats').innerHTML = `
+        <div class="stat-card">
+          <div class="stat-icon purple">📝</div>
+          <div class="stat-value">${regs.length}</div>
+          <div class="stat-label">Total Registrations</div>
+        </div>
+      `;
+    }
+
+    function renderRegistrations() {
+      let regs = MonkDB.getMyRegistrations(user.id).filter(r => r.status !== 'cancelled');
+      regs.sort((a, b) => new Date(b.registeredAt) - new Date(a.registeredAt));
+
+      const container = document.getElementById('regListContainer');
+      if (regs.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">📝</div>
+            <h3>No registrations found</h3>
+            <p>Browse events and register to participate.</p>
+            <a href="monk-events.html" class="btn btn-primary" style="width:auto; margin-top:16px;">Browse Events</a>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = `
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Event</th>
+                <th>Date</th>
+                <th>Location</th>
+                <th>Registered On</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${regs.map(r => {
+                return `
+                  <tr>
+                    <td>
+                      <div style="font-weight:700;">${r.eventName}</div>
+                    </td>
+                    <td>${MonkDB.formatDate(r.eventDate)}</td>
+                    <td>${r.eventLocation}</td>
+                    <td>${MonkDB.formatDate(r.registeredAt)}</td>
+                    <td>
+                      <div style="display:flex; gap:6px;">
+                        <button class="btn btn-outline btn-sm" onclick="location.href='monk-event-detail.html?id=${r.eventId}'">View</button>
+                        <button class="btn btn-danger btn-sm" onclick="confirmCancelRegistration('${r.id}', '${r.eventName}')">Cancel</button>
+                      </div>
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    renderStats();
+    renderRegistrations();
+  </script>
+</body>
+</html>   ZSQAY;'P[ZA

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Volunteer - Monastery Events</title>
+  <link rel="stylesheet" href="css/monk.css">
+</head>
+<body>
+  <div class="monk-dashboard">
+    <div id="sidebarMount"></div>
+
+    <main class="monk-main-content">
+      <div id="topbarMount"></div>
+
+      <div class="page-header">
+        <div>
+          <h1>Volunteer</h1>
+          <p>Offer your help when the monastery needs it, and keep track of your tasks</p>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <div class="tab active" id="tb-calls" onclick="switchTab('calls')">📢 Volunteers Needed</div>
+        <div class="tab" id="tb-tasks" onclick="switchTab('tasks')">📋 My Tasks <span class="badge badge-warning" id="taskCount" style="margin-left:6px; display:none;"></span></div>
+        <div class="tab" id="tb-apps" onclick="switchTab('apps')">🙋 My Applications</div>
+      </div>
+
+      <div class="tab-content active" id="tab-calls"><div class="vol-grid" id="callsGrid"></div></div>
+      <div class="tab-content" id="tab-tasks"><div id="tasksArea"></div></div>
+      <div class="tab-content" id="tab-apps"><div class="card"><div class="card-body" id="appsList"></div></div></div>
+    </main>
+  </div>
+
+  <script src="js/monk-data.js"></script>
+  <script src="js/monk-auth.js"></script>
+  <script src="js/monk-app.js"></script>
+  <script>
+    if (!MonkDB.isLoggedIn()) window.location.href = 'monk-login.html';
+    const user = MonkDB.getCurrentUser();
+    document.getElementById('sidebarMount').innerHTML = renderMonkSidebar('volunteer');
+
+    const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+    function switchTab(t) {
+      ['calls', 'tasks', 'apps'].forEach(x => {
+        document.getElementById('tab-' + x).classList.toggle('active', x === t);
+        document.getElementById('tb-' + x).classList.toggle('active', x === t);
+      });
+    }
+
+    function renderAll() {
+      renderCalls();
+      renderTasks();
+      renderApps();
+    }
+
+    // ---------- Volunteers needed ----------
+    function renderCalls() {
+      const mine = MonkDB.getMyApplications(user.id);
+      const calls = MonkDB.getCalls().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+      const shown = calls.filter(c => MonkDB.callStats(c).open || mine.some(a => a.callId === c.id));
+      document.getElementById('callsGrid').innerHTML = shown.length ? shown.map(c => {
+        const st = MonkDB.callStats(c);
+        const my = mine.find(a => a.callId === c.id);
+        const left = Math.max(0, c.needed - st.approved);
+        let action;
+        if (my) {
+          const b = my.status === 'approved' ? 'badge-success' : my.status === 'rejected' ? 'badge-danger' : 'badge-warning';
+          action = `<span class="badge ${b}">You applied · ${esc(my.status)}</span>`;
+        } else if (st.open) {
+          action = `<button class="btn btn-primary btn-sm" onclick="openApply('${esc(c.id)}')">🙋 I want to help</button>`;
+        } else {
+          action = `<span class="badge badge-secondary">${st.filled ? 'filled' : 'closed'}</span>`;
+        }
+        return `
+          <div class="vol-card fade-in">
+            <div class="meta">${esc(c.role)}${c.eventName ? ' · ' + esc(c.eventName) : ''}</div>
+            <h3>${esc(c.title)}</h3>
+            ${c.description ? `<p>${esc(c.description)}</p>` : ''}
+            <div>
+              <div class="vol-meter"><div style="width:${Math.min(100, Math.round(st.approved / c.needed * 100))}%"></div></div>
+              <div class="meta" style="margin-top:5px;">${left} of ${c.needed} places left${c.deadline ? ' · apply by ' + MonkDB.formatDate(c.deadline) : ''}</div>
+            </div>
+            <div class="footer">${action}</div>
+          </div>`;
+      }).join('') : `<div class="empty-state" style="grid-column:1/-1;"><div class="empty-icon">📢</div><h3>No volunteers needed right now</h3><p>When the monastery announces a need it will appear here and in your notifications.</p></div>`;
+    }
+
+    function openApply(callId) {
+      const c = MonkDB.getCalls().find(x => x.id === callId);
+      if (!c) return;
+      let ov = document.getElementById('applyOverlay');
+      if (!ov) { ov = document.createElement('div'); ov.id = 'applyOverlay'; ov.className = 'modal-overlay'; document.body.appendChild(ov); }
+      ov.innerHTML = `
+        <div class="modal">
+          <div class="modal-header"><h3>Volunteer: ${esc(c.title)}</h3><button class="modal-close" onclick="closeApply()">✕</button></div>
+          <div class="modal-body">
+            <div class="form-group"><label>Phone (so we can reach you)</label>
+              <div class="input-wrapper"><span class="input-icon">📱</span><input type="tel" id="aPhone" value="${esc(user.phone || '')}" placeholder="+975 17..."></div>
+            </div>
+            <div class="form-group"><label>When are you available?</label>
+              <div class="input-wrapper"><span class="input-icon">🕐</span><input type="text" id="aAvail" placeholder="e.g. weekends, mornings, any day"></div>
+            </div>
+            <div class="form-group"><label>Message (optional)</label>
+              <textarea id="aMsg" rows="3" style="width:100%; padding:12px; border:1.5px solid var(--border); border-radius:8px; font-size:14px;" placeholder="Skills or experience you can offer..."></textarea>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeApply()">Cancel</button>
+            <button class="btn btn-primary" onclick="submitApply('${esc(c.id)}')">Send Offer</button>
+          </div>
+        </div>`;
+      ov.classList.add('active');
+    }
+    function closeApply() { const o = document.getElementById('applyOverlay'); if (o) o.classList.remove('active'); }
+
+    function submitApply(callId) {
+      const res = MonkDB.applyToCall(user.id, callId, {
+        phone: document.getElementById('aPhone').value,
+        availability: document.getElementById('aAvail').value,
+        message: document.getElementById('aMsg').value
+      });
+      if (!res.success) { showToast(res.message, 'error'); return; }
+      closeApply();
+      showToast('Offer sent! The admin will review it.', 'success');
+      renderAll();
+    }
+
+    // ---------- My tasks ----------
+    function renderTasks() {
+      const vol = MonkDB.getMyVolunteer(user);
+      const area = document.getElementById('tasksArea');
+      const badge = document.getElementById('taskCount');
+      if (!vol) {
+        badge.style.display = 'none';
+        area.innerHTML = `<div class="notice-box">🤝 You are not a volunteer yet. Offer your help under <b>Volunteers Needed</b> — once the admin approves you, your tasks and open tasks you can take will appear here.</div>`;
+        return;
+      }
+      const mine = MonkDB.getMyTasks(vol);
+      const active = mine.filter(t => t.status !== 'done').length;
+      badge.textContent = active; badge.style.display = active ? '' : 'none';
+      const cols = [['todo', 'To Do', '#f59e0b'], ['in-progress', 'In Progress', '#3b82f6'], ['done', 'Done', '#22c55e']];
+
+      const open = MonkDB.getOpenTasks();
+      let html = `<div class="notice-box">Hello <b>${esc(vol.name)}</b> — you are a volunteer (${esc(vol.role)}). Update your tasks as you work on them.</div>`;
+
+      html += cols.map(([key, label, color]) => {
+        const items = mine.filter(t => t.status === key);
+        return `<div class="task-col"><h4><i style="background:${color}"></i>${label} <span style="color:var(--text-muted); font-weight:500;">(${items.length})</span></h4>
+          ${items.length ? items.map(t => `
+            <div class="task-item" style="border-left-color:${color};">
+              <div style="flex:1; min-width:200px;">
+                <div class="t-title">${esc(t.title)}</div>
+                <div class="t-meta">${esc(t.eventName) || 'No event'}${t.dueDate ? ' · due ' + MonkDB.formatDate(t.dueDate) : ''} · priority <span class="prio-${esc(t.priority)}">${esc(t.priority)}</span></div>
+                ${t.description ? `<div class="t-desc">${esc(t.description)}</div>` : ''}
+              </div>
+              <div>
+                ${key === 'todo' ? `<button class="btn btn-primary btn-sm" onclick="setStatus('${esc(t.id)}','in-progress')">▶ Start</button>` : ''}
+                ${key === 'in-progress' ? `<button class="btn btn-primary btn-sm" onclick="setStatus('${esc(t.id)}','done')">✔ Mark done</button> <button class="btn btn-outline btn-sm" onclick="setStatus('${esc(t.id)}','todo')">↩</button>` : ''}
+                ${key === 'done' ? `<span class="badge badge-success">completed</span>` : ''}
+              </div>
+            </div>`).join('') : `<div style="font-size:13px; color:var(--text-muted); padding:4px 2px;">Nothing here</div>`}
+        </div>`;
+      }).join('');
+
+      html += `<div class="section-header"><h2>🔓 Open tasks you can take</h2></div>` + (open.length ? open.map(t => `
+        <div class="task-item" style="border-left-color:var(--primary);">
+          <div style="flex:1; min-width:200px;">
+            <div class="t-title">${esc(t.title)}</div>
+            <div class="t-meta">${esc(t.eventName) || 'No event'}${t.dueDate ? ' · due ' + MonkDB.formatDate(t.dueDate) : ''} · priority <span class="prio-${esc(t.priority)}">${esc(t.priority)}</span></div>
+            ${t.description ? `<div class="t-desc">${esc(t.description)}</div>` : ''}
+          </div>
+          <button class="btn btn-gold btn-sm" onclick="takeTask('${esc(t.id)}')">✋ Take this task</button>
+        </div>`).join('') : `<div style="font-size:13px; color:var(--text-muted);">No open tasks right now.</div>`);
+      area.innerHTML = html;
+    }
+
+    function setStatus(id, status) {
+      const res = MonkDB.setMyTaskStatus(user.id, id, status);
+      if (!res.success) { showToast(res.message || 'Could not update', 'error'); return; }
+      showToast(status === 'done' ? 'Great work! Task completed 🙏' : 'Task updated', 'success');
+      renderAll();
+    }
+
+    function takeTask(id) {
+      const res = MonkDB.claimTask(user.id, id);
+      if (!res.success) { showToast(res.message, 'error'); renderAll(); return; }
+      showToast('Task added to your list', 'success');
+      renderAll();
+    }
+
+    // ---------- My applications ----------
+    function renderApps() {
+      const apps = MonkDB.getMyApplications(user.id);
+      document.getElementById('appsList').innerHTML = apps.length ? apps.map(a => {
+        const b = a.status === 'approved' ? 'badge-success' : a.status === 'rejected' ? 'badge-danger' : 'badge-warning';
+        return `
+          <div class="list-item">
+            <div class="item-icon ${a.status === 'approved' ? 'green' : 'gold'}">🙋</div>
+            <div class="item-info">
+              <div class="item-title">${esc(a.callTitle)}</div>
+              <div class="item-subtitle">Sent ${MonkDB.formatDate(a.createdAt)}</div>
+            </div>
+            <span class="badge ${b}">${esc(a.status)}</span>
+            ${a.status === 'pending' ? `<button class="btn btn-outline btn-sm" style="width:auto;" onclick="withdraw('${esc(a.id)}')">Withdraw</button>` : ''}
+          </div>`;
+      }).join('') : `<div class="empty-state" style="padding:30px;"><div class="empty-icon">🙋</div><p>You haven't offered to volunteer yet.</p></div>`;
+    }
+
+    function withdraw(id) {
+      if (!confirm('Withdraw this offer?')) return;
+      MonkDB.withdrawApplication(id, user.id);
+      showToast('Offer withdrawn', 'warning');
+      renderAll();
+    }
+
+    renderAll();
+  </script>
+</body>
+</html>

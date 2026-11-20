@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Events - Admin Panel</title>
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+  <div class="admin-dashboard">
+    <div id="sidebarMount"></div>
+    <main class="admin-main-content">
+      <div id="topbarMount"></div>
+
+      <div class="page-header">
+        <div>
+          <h1>Events Management</h1>
+          <p>Create, edit, and manage all monastery events</p>
+        </div>
+        <button class="btn btn-primary" onclick="openEventModal()">+ Add New Event</button>
+      </div>
+
+      <div class="search-bar">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchEvents" placeholder="Search events..." oninput="renderEvents()">
+      </div>
+
+      <div class="filter-chips" id="eventFilters">
+        <div class="chip active" onclick="setEventFilter('all', this)">All</div>
+        <div class="chip" onclick="setEventFilter('upcoming', this)">Upcoming</div>
+        <div class="chip" onclick="setEventFilter('completed', this)">Completed</div>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Event Name</th>
+              <th>Date</th>
+              <th>Location</th>
+              <th>Registered</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="eventsTable"></tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <script src="js/admin-data.js"></script>
+  <script src="js/admin-auth.js"></script>
+  <script src="js/admin-app.js"></script>
+  <script>
+    if (!AdminDB.isLoggedIn()) window.location.href = 'admin-login.html';
+    document.getElementById('sidebarMount').innerHTML = renderAdminSidebar('events');
+    
+    let currentFilter = 'all';
+
+    function renderEvents() {
+      const query = document.getElementById('searchEvents').value.toLowerCase();
+      let events = AdminDB.getEvents();
+
+      if (currentFilter !== 'all') events = events.filter(e => e.status === currentFilter);
+      if (query) events = events.filter(e =>
+        e.name.toLowerCase().includes(query) ||
+        e.type.toLowerCase().includes(query) ||
+        e.location.toLowerCase().includes(query)
+      );
+
+      const tbody = document.getElementById('eventsTable');
+      if (!events.length) {
+        tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">📅</div><h3>No events found</h3></div></td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = events.map(e => {
+        const b = e.status === 'upcoming' ? 'badge-info' : e.status === 'planned' ? 'badge-warning' : e.status === 'completed' ? 'badge-secondary' : 'badge-purple';
+        return `
+          <tr>
+            <td>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <div style="width:36px; height:36px; border-radius:8px; background:#f1f5f9; display:flex; align-items:center; justify-content:center; font-size:18px; overflow:hidden;">${e.image ? `<img src="${e.image}" alt="" style="width:100%; height:100%; object-fit:cover;">` : e.icon}</div>
+                <div>
+                  <div style="font-weight:700;">${e.name}</div>
+                  <div style="font-size:11px; color:#94a3b8;">${e.type}</div>
+                </div>
+              </div>
+            </td>
+            <td>${AdminDB.formatDate(e.date)}</td>
+            <td>${e.location}</td>
+            <td>${e.registered || 0}</td>
+            <td><span class="badge ${b}">${e.status}</span></td>
+            <td>
+              <div style="display:flex; gap:4px;">
+                <button class="btn-icon" onclick="openEventModal('${e.id}')" title="Edit">✏️</button>
+                <button class="btn-icon danger" onclick="deleteEvent('${e.id}')" title="Delete">🗑️</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function setEventFilter(f, el) {
+      currentFilter = f;
+      document.querySelectorAll('#eventFilters .chip').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      renderEvents();
+    }
+
+    let evImageData = '';
+
+    function openEventModal(eventId = null) {
+      const event = eventId ? AdminDB.getEventById(eventId) : null;
+      const isEdit = !!event;
+      const e = event || { name: '', type: 'Religious Festival', description: '', date: '', time: '09:00 AM - 05:00 PM', location: '', organizer: '', status: 'upcoming', icon: '🪷', image: '', color: 'gold', requirements: '' };
+      evImageData = e.image || '';
+
+      openModal('eventModal', `
+        <div class="modal">
+          <div class="modal-header">
+            <h3>${isEdit ? 'Edit Event' : 'Create New Event'}</h3>
+            <button class="modal-close" onclick="closeModal('eventModal')">✕</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label>Event Name</label>
+              <div class="input-wrapper"><span class="input-icon">📅</span>
+                <input type="text" id="evName" value="${e.name}" placeholder="e.g. Buddha Purnima" required>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Type</label>
+                <div class="input-wrapper"><span class="input-icon">🏷️</span>
+                  <select id="evType">
+                    ${['Religious Festival','Cultural','Wellness','Education','Prayer','New Year Festival'].map(t => `<option ${e.type === t ? 'selected' : ''}>${t}</option>`).join('')}
+                  </select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Status</label>
+                <div class="input-wrapper"><span class="input-icon">⚡</span>
+                  <select id="evStatus">
+                    ${['upcoming','completed'].map(s => `<option ${e.status === s ? 'selected' : ''}>${s}</option>`).join('')}
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Description</label>
+              <div class="input-wrapper"><span class="input-icon">📝</span>
+                <textarea id="evDesc" rows="3" style="padding-left:42px;">${e.description}</textarea>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Date</label>
+                <div class="input-wrapper"><span class="input-icon">📆</span>
+                  <input type="date" id="evDate" value="${e.date}">
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Time</label>
+                <div class="input-wrapper"><span class="input-icon">🕐</span>
+                  <input type="text" id="evTime" value="${e.time}" placeholder="09:00 AM - 05:00 PM">
+                </div>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Location</label>
+                <div class="input-wrapper"><span class="input-icon">📍</span>
+                  <input type="text" id="evLocation" value="${e.location}" placeholder="Main Temple">
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Organizer</label>
+                <div class="input-wrapper"><span class="input-icon">👤</span>
+                  <input type="text" id="evOrganizer" value="${e.organizer}" placeholder="Monastery Council">
+                </div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Event Photo</label>
+              <div style="display:flex; align-items:center; gap:14px; padding:12px; border:1px dashed #cbd5e1; border-radius:12px; background:#f8fafc;">
+                <div id="evPhotoPreview" style="width:96px; height:64px; border-radius:10px; background:#e2e8f0; display:flex; align-items:center; justify-content:center; font-size:28px; overflow:hidden; flex-shrink:0;"></div>
+                <div style="display:flex; flex-direction:column; gap:6px;">
+                  <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <label for="evPhotoFile" class="btn btn-outline btn-sm" style="cursor:pointer; margin:0;">📷 Choose photo</label>
+                    <button type="button" class="btn btn-outline btn-sm" id="evPhotoRemove" onclick="removeEventPhoto()">Remove</button>
+                  </div>
+                  <span style="font-size:11px; color:#94a3b8;">JPG or PNG. Shown on the event card and detail page.</span>
+                </div>
+                <input type="file" id="evPhotoFile" accept="image/*" style="display:none;" onchange="handleEventPhoto(this)">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Requirements</label>
+              <div class="input-wrapper"><span class="input-icon">📋</span>
+                <textarea id="evReq" rows="2" style="padding-left:42px;">${e.requirements || ''}</textarea>
+              </div>
+            </div>
+            ${!isEdit ? `
+            <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer; margin-top:6px;">
+              <input type="checkbox" id="evNotify" checked> 🔔 Send notification about this event to all users
+            </label>` : ''}
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('eventModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="saveEvent('${e.id || ''}')">${isEdit ? 'Save Changes' : 'Create Event'}</button>
+          </div>
+        </div>
+      `);
+      updatePhotoPreview(e.icon);
+    }
+
+    function updatePhotoPreview(icon) {
+      const box = document.getElementById('evPhotoPreview');
+      if (!box) return;
+      box.innerHTML = evImageData
+        ? `<img src="${evImageData}" alt="" style="width:100%; height:100%; object-fit:cover;">`
+        : (icon || '🪷');
+      const rm = document.getElementById('evPhotoRemove');
+      if (rm) rm.style.display = evImageData ? '' : 'none';
+    }
+
+    // Resize the chosen image so it fits comfortably in localStorage
+    function handleEventPhoto(input) {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      if (!file.type.startsWith('image/')) {
+        showToast('Please choose an image file', 'error');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const MAX = 900;
+          const scale = Math.min(1, MAX / img.width);
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+          evImageData = canvas.toDataURL('image/jpeg', 0.8);
+          updatePhotoPreview();
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function removeEventPhoto() {
+      evImageData = '';
+      const f = document.getElementById('evPhotoFile');
+      if (f) f.value = '';
+      updatePhotoPreview();
+    }
+
+    function saveEvent(id) {
+      const data = {
+        name: document.getElementById('evName').value.trim(),
+        type: document.getElementById('evType').value,
+        status: document.getElementById('evStatus').value,
+        description: document.getElementById('evDesc').value.trim(),
+        date: document.getElementById('evDate').value,
+        time: document.getElementById('evTime').value,
+        location: document.getElementById('evLocation').value.trim(),
+        organizer: document.getElementById('evOrganizer').value.trim(),
+        image: evImageData,
+        requirements: document.getElementById('evReq').value.trim()
+      };
+
+      if (!data.name || !data.date || !data.location) {
+        showToast('Please fill all required fields', 'error');
+        return;
+      }
+
+      if (id) {
+        AdminDB.updateEvent(id, data);
+        showToast('Event updated successfully', 'success');
+      } else {
+        const notifyBox = document.getElementById('evNotify');
+        data.notifyUsers = notifyBox ? notifyBox.checked : true;
+        const res = AdminDB.addEvent(data);
+        showToast(res.notified
+          ? `Event created and ${res.notified} users notified`
+          : 'Event created successfully', 'success');
+      }
+      closeModal('eventModal');
+      renderEvents();
+    }
+
+    function deleteEvent(id) {
+      if (confirm('Delete this event? All related registrations will also be removed.')) {
+        AdminDB.deleteEvent(id);
+        showToast('Event deleted', 'warning');
+        renderEvents();
+      }
+    }
+
+    renderEvents();
+  </script>
+</body>
+</html>

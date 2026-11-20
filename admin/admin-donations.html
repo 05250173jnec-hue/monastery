@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Donations - Admin</title>
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+  <div class="admin-dashboard">
+    <div id="sidebarMount"></div>
+    <main class="admin-main-content">
+      <div id="topbarMount"></div>
+
+      <div class="page-header">
+        <div>
+          <h1>Donations</h1>
+          <p>Track and manage all donations</p>
+        </div>
+        <button class="btn btn-primary" onclick="openDonationModal()">+ Record Donation</button>
+      </div>
+
+      <div class="stats-grid" style="grid-template-columns:repeat(6,1fr);">
+        <div class="stat-card"><div class="stat-value" id="dTotal" style="font-size:22px;">Nu 0</div><div class="stat-label">Money Collected</div></div>
+        <div class="stat-card"><div class="stat-value" id="dAvg" style="font-size:22px;">Nu 0</div><div class="stat-label">Avg. Money Gift</div></div>
+        <div class="stat-card"><div class="stat-value" id="dPending" style="color:#f59e0b;">0</div><div class="stat-label">Payments to Verify</div></div>
+        <div class="stat-card"><div class="stat-value" id="dProducts">0</div><div class="stat-label">Product Donations</div></div>
+        <div class="stat-card"><div class="stat-value" id="dCount">0</div><div class="stat-label">Total Donors</div></div>
+        <div class="stat-card"><div class="stat-value" id="dGoal" style="font-size:22px;">0%</div><div class="stat-label">Goal Progress</div></div>
+      </div>
+
+      <div class="content-grid">
+        <div class="card">
+          <div class="card-header"><h2>Monthly Donations</h2></div>
+          <div class="card-body" style="padding:20px;">
+            <div id="monthlyChart" style="display:flex; align-items:flex-end; gap:14px; height:200px;"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><h2>Top Donors</h2></div>
+          <div class="card-body" id="topDonors"></div>
+        </div>
+      </div>
+
+      <div class="filter-chips" style="display:flex; gap:8px; margin-bottom:14px;">
+        <div class="chip active" onclick="setTypeFilter('all', this)">All</div>
+        <div class="chip" onclick="setTypeFilter('money', this)">💰 Money</div>
+        <div class="chip" onclick="setTypeFilter('product', this)">🎁 Products</div>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr><th>Donor</th><th>Type</th><th>Donation</th><th>Event</th><th>Date</th><th>Status</th><th>Actions</th></tr>
+          </thead>
+          <tbody id="donationsTable"></tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <script src="js/admin-data.js"></script>
+  <script src="js/admin-auth.js"></script>
+  <script src="js/admin-app.js"></script>
+  <script>
+    if (!AdminDB.isLoggedIn()) window.location.href = 'admin-login.html';
+    document.getElementById('sidebarMount').innerHTML = renderAdminSidebar('donations');
+
+    const GOAL = 100000;
+    let typeFilter = 'all';
+    const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const isProduct = d => d.type === 'product';
+
+    function setTypeFilter(t, el) {
+      typeFilter = t;
+      document.querySelectorAll('.filter-chips .chip').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      renderAll();
+    }
+
+    function renderAll() {
+      const donations = AdminDB.getDonations();
+      const money = donations.filter(d => !isProduct(d) && d.status !== 'pending' && d.status !== 'declined');   // confirmed money only
+      const total = money.reduce((s,d) => s + Number(d.amount), 0);
+      const avg = money.length ? Math.round(total / money.length) : 0;
+      const donors = new Set(donations.map(d => d.email || d.donor)).size;
+      const progress = Math.min(100, Math.round((total / GOAL) * 100));
+      const pendingProducts = donations.filter(d => isProduct(d) && d.status === 'pending').length;
+      const pendingMoney = donations.filter(d => !isProduct(d) && d.status === 'pending').length;
+
+      document.getElementById('dTotal').textContent = AdminDB.formatCurrency(total);
+      document.getElementById('dPending').textContent = pendingMoney;
+      document.getElementById('dAvg').textContent = AdminDB.formatCurrency(avg);
+      document.getElementById('dProducts').textContent = donations.filter(isProduct).length + (pendingProducts ? ` (${pendingProducts} pending)` : '');
+      document.getElementById('dProducts').style.fontSize = pendingProducts ? '18px' : '';
+      document.getElementById('dCount').textContent = donors;
+      document.getElementById('dGoal').textContent = progress + '%';
+
+      // Monthly money donations (last 7 months)
+      const now = new Date();
+      const months = [];
+      for (let i = 6; i >= 0; i--) {
+        const m = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        months.push({ key: m.getFullYear() + '-' + String(m.getMonth() + 1).padStart(2, '0'), label: m.toLocaleDateString('en-US', { month: 'short' }), sum: 0 });
+      }
+      money.forEach(d => { const m = months.find(x => String(d.date).startsWith(x.key)); if (m) m.sum += Number(d.amount); });
+      const maxSum = Math.max(1, ...months.map(m => m.sum));
+      document.getElementById('monthlyChart').innerHTML = months.map(m => `
+        <div style="flex:1; height:100%; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; gap:8px;" title="${m.label}: ${AdminDB.formatCurrency(m.sum)}">
+          <div style="width:100%; height:${Math.max(3, Math.round(m.sum / maxSum * 85))}%; background:linear-gradient(180deg,#2563eb,#60a5fa); border-radius:6px 6px 0 0;"></div>
+          <span style="font-size:11px; color:#94a3b8;">${m.label}</span>
+        </div>`).join('');
+
+      // Top donors (money)
+      const grouped = {};
+      money.forEach(d => {
+        const key = d.email || d.donor;
+        if (!grouped[key]) grouped[key] = { donor: d.donor, email: d.email, total: 0 };
+        grouped[key].total += Number(d.amount);
+      });
+      const top = Object.values(grouped).sort((a,b) => b.total - a.total).slice(0,5);
+      document.getElementById('topDonors').innerHTML = top.map((d, i) => `
+        <div class="list-item">
+          <div class="item-icon ${i === 0 ? 'orange' : 'green'}">${i === 0 ? '🏆' : '👤'}</div>
+          <div class="item-info">
+            <div class="item-title">${esc(d.donor)}</div>
+            <div class="item-subtitle">${esc(d.email) || 'No email'}</div>
+          </div>
+          <div class="item-amount">${AdminDB.formatCurrency(d.total)}</div>
+        </div>
+      `).join('') || '<div class="empty-state"><p>No donations</p></div>';
+
+      // Table
+      const rows = donations.filter(d => typeFilter === 'all' || (typeFilter === 'product') === isProduct(d));
+      const sorted = [...rows].sort((a,b) => (b.createdAt || b.date).localeCompare(a.createdAt || a.date));
+      document.getElementById('donationsTable').innerHTML = sorted.map(d => {
+        const p = isProduct(d);
+        const detail = p
+          ? `<div style="font-weight:700;">${esc(d.productName)} · ${esc(d.quantity)} ${esc(d.unit)}</div>
+             <div style="font-size:11px; color:#94a3b8;">${esc(d.category)}${d.estValue ? ' · est. ' + AdminDB.formatCurrency(d.estValue) : ''} · ${esc(d.method)}${d.pickupAddress ? ' (' + esc(d.pickupAddress) + ')' : ''}</div>
+             ${d.description ? `<div style="font-size:11px; color:#94a3b8;">“${esc(d.description)}”</div>` : ''}`
+          : `<div style="font-weight:700; color:#22c55e;">${AdminDB.formatCurrency(d.amount)}</div>
+             <div style="font-size:11px; color:#94a3b8;">${esc(d.method)}${d.txnId ? ' · Ref: <b>' + esc(d.txnId) + '</b>' : ''}${d.description ? ' · “' + esc(d.description) + '”' : ''}</div>`;
+        const st = d.status || 'received';
+        const badge = st === 'received' ? 'badge-success' : st === 'declined' ? 'badge-danger' : 'badge-warning';
+        const actions = (st === 'pending')
+          ? `<button class="btn-icon" title="Confirm (payment / goods received)" onclick="setStatus('${esc(d.id)}','received')">✅</button>
+             <button class="btn-icon danger" title="Decline" onclick="setStatus('${esc(d.id)}','declined')">🚫</button>`
+          : '';
+        return `
+        <tr>
+          <td>
+            <div style="font-weight:700;">${esc(d.donor)}</div>
+            <div style="font-size:11px; color:#94a3b8;">${esc(d.email)}</div>
+          </td>
+          <td><span class="badge ${p ? 'badge-purple' : 'badge-info'}">${p ? '🎁 Product' : '💰 Money'}</span></td>
+          <td>${detail}</td>
+          <td>${esc(d.eventName)}</td>
+          <td>${AdminDB.formatDate(d.date)}</td>
+          <td><span class="badge ${badge}">${esc(st)}</span></td>
+          <td style="white-space:nowrap;">${actions}<button class="btn-icon danger" title="Delete" onclick="deleteDonation('${esc(d.id)}')">🗑️</button></td>
+        </tr>`;
+      }).join('') || `<tr><td colspan="7"><div class="empty-state"><p>No donations</p></div></td></tr>`;
+    }
+
+    function setStatus(id, status) {
+      AdminDB.updateDonationStatus(id, status);
+      showToast(status === 'received' ? 'Confirmed - added to totals' : 'Donation declined', 'success');
+      renderAll();
+    }
+
+    let modalType = 'money';
+
+    function openDonationModal() {
+      modalType = 'money';
+      const events = AdminDB.getEvents();
+      openModal('donModal', `
+        <div class="modal">
+          <div class="modal-header">
+            <h3>Record Donation</h3>
+            <button class="modal-close" onclick="closeModal('donModal')">✕</button>
+          </div>
+          <div class="modal-body">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:18px;">
+              <div class="chip active" id="mtMoney" style="text-align:center; justify-content:center;" onclick="setModalType('money')">💰 Money</div>
+              <div class="chip" id="mtProduct" style="text-align:center; justify-content:center;" onclick="setModalType('product')">🎁 Product</div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label>Donor Name</label>
+                <div class="input-wrapper"><span class="input-icon">👤</span><input type="text" id="dName" placeholder="Full name"></div>
+              </div>
+              <div class="form-group"><label>Email</label>
+                <div class="input-wrapper"><span class="input-icon">✉️</span><input type="email" id="dEmail" placeholder="email@example.com"></div>
+              </div>
+            </div>
+            <div id="mMoney">
+              <div class="form-row">
+                <div class="form-group"><label>Amount (Nu.)</label>
+                  <div class="input-wrapper"><span class="input-icon">💰</span><input type="number" id="dAmount" min="1" placeholder="1000"></div>
+                </div>
+                <div class="form-group"><label>Method</label>
+                  <div class="input-wrapper"><span class="input-icon">💳</span>
+                    <select id="dMethod"><option>Cash</option><option>Bank Transfer</option><option>Cheque</option><option>Online</option></select>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div id="mProduct" style="display:none;">
+              <div class="form-group"><label>Product</label>
+                <div class="input-wrapper"><span class="input-icon">📦</span><input type="text" id="dProd" placeholder="e.g. Rice, Butter lamps"></div>
+              </div>
+              <div class="form-row">
+                <div class="form-group"><label>Quantity</label>
+                  <div class="input-wrapper"><span class="input-icon">#️⃣</span><input type="number" id="dQty" min="1" placeholder="10"></div>
+                </div>
+                <div class="form-group"><label>Unit</label>
+                  <div class="input-wrapper"><span class="input-icon">⚖️</span>
+                    <select id="dUnit"><option>pcs</option><option>kg</option><option>boxes</option><option>bags</option><option>litres</option><option>sets</option></select>
+                  </div>
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group"><label>Category</label>
+                  <div class="input-wrapper"><span class="input-icon">🏷️</span>
+                    <select id="dCat"><option>Food &amp; Grains</option><option>Butter &amp; Lamp Oil</option><option>Robes &amp; Clothing</option><option>Books &amp; Scriptures</option><option>Medicine &amp; Health</option><option>Furniture &amp; Equipment</option><option>Other</option></select>
+                  </div>
+                </div>
+                <div class="form-group"><label>Est. value (Nu., optional)</label>
+                  <div class="input-wrapper"><span class="input-icon">💰</span><input type="number" id="dVal" min="0" placeholder="0"></div>
+                </div>
+              </div>
+            </div>
+            <div class="form-group"><label>Related Event (optional)</label>
+              <div class="input-wrapper"><span class="input-icon">📅</span>
+                <select id="dEvent"><option value="">General Donation</option>${events.map(e => `<option value="${esc(e.id)}">${esc(e.name)}</option>`).join('')}</select>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('donModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="saveDonation()">Record</button>
+          </div>
+        </div>
+      `);
+    }
+
+    function setModalType(t) {
+      modalType = t;
+      document.getElementById('mMoney').style.display = t === 'money' ? '' : 'none';
+      document.getElementById('mProduct').style.display = t === 'product' ? '' : 'none';
+      document.getElementById('mtMoney').classList.toggle('active', t === 'money');
+      document.getElementById('mtProduct').classList.toggle('active', t === 'product');
+    }
+
+    function saveDonation() {
+      const data = {
+        type: modalType,
+        donor: document.getElementById('dName').value.trim(),
+        email: document.getElementById('dEmail').value.trim(),
+        eventId: document.getElementById('dEvent').value
+      };
+      if (modalType === 'money') {
+        data.amount = document.getElementById('dAmount').value;
+        data.method = document.getElementById('dMethod').value;
+        if (!data.donor || !(Number(data.amount) > 0)) { showToast('Donor and a valid amount required', 'error'); return; }
+      } else {
+        data.productName = document.getElementById('dProd').value.trim();
+        data.quantity = document.getElementById('dQty').value;
+        data.unit = document.getElementById('dUnit').value;
+        data.category = document.getElementById('dCat').value;
+        data.estValue = document.getElementById('dVal').value;
+        data.method = 'Drop-off';
+        data.status = 'received';
+        if (!data.donor || !data.productName || !(Number(data.quantity) > 0)) { showToast('Donor, product and quantity required', 'error'); return; }
+      }
+      AdminDB.addDonation(data);
+      showToast('Donation recorded', 'success');
+      closeModal('donModal');
+      renderAll();
+    }
+
+    function deleteDonation(id) {
+      if (confirm('Delete this donation record?')) {
+        AdminDB.deleteDonation(id);
+        renderAll();
+      }
+    }
+
+    renderAll();
+  </script>
+  <!-- Dark Mode Toggle Button -->
+<button id="darkModeToggle" onclick="toggleDarkMode()" style="position:fixed; bottom:20px; right:20px; width:50px; height:50px; border-radius:50%; background:var(--primary, #2563eb); color:white; font-size:22px; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 15px rgba(0,0,0,0.3); z-index:9999; cursor:pointer; border:none; transition:transform 0.2s;">
+  🌙
+</button>
+
+<!-- Dark Mode Script -->
+<script>
+  // Check if dark mode was previously enabled
+  if (localStorage.getItem('theme') === 'dark') {
+    document.body.classList.add('dark-mode');
+    document.getElementById('darkModeToggle').innerHTML = '☀️';
+  }
+
+  // The toggle function
+  function toggleDarkMode() {
+    document.body.classList.toggle('dark-mode');
+    const btn = document.getElementById('darkModeToggle');
+    
+    if (document.body.classList.contains('dark-mode')) {
+      localStorage.setItem('theme', 'dark');
+      btn.innerHTML = '☀️'; // Sun icon for light mode
+    } else {
+      localStorage.setItem('theme', 'light');
+      btn.innerHTML = '🌙'; // Moon icon for dark mode
+    }
+  }
+</script>
+</body>
+</html>

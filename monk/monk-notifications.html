@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Notifications - Monastery Events</title>
+  <link rel="stylesheet" href="css/monk.css">
+</head>
+<body>
+  <div class="monk-dashboard">
+    <div id="sidebarMount"></div>
+
+    <main class="monk-main-content">
+      <div id="topbarMount"></div>
+
+      <div class="page-header">
+        <div>
+          <h1>Notifications</h1>
+          <p>Stay updated with event announcements and registration updates</p>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="markAllRead()">✓ Mark all as read</button>
+      </div>
+
+      <div id="notifsContainer"></div>
+    </main>
+  </div>
+
+  <script src="js/monk-data.js"></script>
+  <script src="js/monk-auth.js"></script>
+  <script src="js/monk-app.js"></script>
+  <script>
+    if (!MonkDB.isLoggedIn()) window.location.href = 'monk-login.html';
+
+    document.getElementById('sidebarMount').innerHTML = renderMonkSidebar('notifications');
+   
+    const user = MonkDB.getCurrentUser();
+
+    function renderNotifications() {
+      const notifs = MonkDB.getMyNotifications(user.id);
+      const container = document.getElementById('notifsContainer');
+
+      if (notifs.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">🔔</div>
+            <h3>No notifications yet</h3>
+            <p>You'll be notified about events and registration updates here.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = `
+        <div class="card">
+          <div class="card-body">
+            ${notifs.map(n => `
+              <div class="list-item" style="padding:18px 14px; ${!n.read ? 'background:#faf9ff;' : ''}" onclick="markRead('${n.id}')">
+                <div class="item-icon ${n.type === 'success' ? 'green' : n.type === 'warning' ? 'gold' : n.type === 'error' ? 'red' : 'purple'}">${n.icon}</div>
+                <div class="item-info">
+                  <div class="item-title">${n.title}</div>
+                  <div class="item-subtitle" style="white-space:normal;">${n.message}</div>
+                  <div style="font-size:11px; color:#8b8ba7; margin-top:6px;">${MonkDB.formatTime(n.date)}</div>
+                </div>
+                ${!n.read ? '<span style="width:10px; height:10px; background:#7c3aed; border-radius:50%; flex-shrink:0;"></span>' : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function markRead(id) {
+      MonkDB.markNotificationRead(id);
+      renderNotifications();
+    }
+
+    function markAllRead() {
+      MonkDB.markAllNotificationsRead(user.id);
+      showToast('All notifications marked as read', 'success');
+      renderNotifications();
+    }
+
+    renderNotifications();
+  </script>
+</body>
+</html>
